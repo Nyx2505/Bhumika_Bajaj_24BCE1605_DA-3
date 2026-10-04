@@ -94,6 +94,25 @@ export interface ChaosScenario {
   durationSeconds: number;
 }
 
+export type SimulatorIncidentType =
+  | 'NORMAL'
+  | 'CPU_SPIKE'
+  | 'TRAFFIC_SPIKE'
+  | 'ERROR_SPIKE'
+  | 'DATABASE_LOAD'
+  | 'RECOVERY';
+
+export interface SimulatorTimelineEvent {
+  id: string;
+  time: string; // e.g. "10:40"
+  timestamp: string; // ISO string
+  title: string; // e.g. "Normal operation", "CPU Spike triggered", "CPU threshold breached", "High CPU alarm → ALARM", "Recovery triggered", "High CPU alarm → OK"
+  type: 'NORMAL' | 'INCIDENT_TRIGGERED' | 'THRESHOLD_BREACHED' | 'ALARM_TRANSITION' | 'RECOVERY_TRIGGERED' | 'RESET';
+  severity: 'info' | 'warn' | 'alarm' | 'ok';
+  description?: string;
+  resourceId?: string;
+}
+
 export interface LearningChallenge {
   id: string;
   title: string;

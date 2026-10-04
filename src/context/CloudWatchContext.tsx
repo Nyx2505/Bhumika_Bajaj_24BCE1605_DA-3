@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { AWS_RESOURCES } from '../data/initialResources';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import { AWS_RESOURCES, METRIC_DEFINITIONS } from '../data/initialResources';
 import { INITIAL_ALARMS } from '../data/initialAlarms';
 import { INITIAL_LOG_GROUPS, INITIAL_LOG_EVENTS } from '../data/initialLogs';
 import {
@@ -8,12 +8,15 @@ import {
   LogEvent,
   LogGroup,
   MetricDatapoint,
-  ChaosScenario
+  ChaosScenario,
+  SimulatorIncidentType,
+  SimulatorTimelineEvent
 } from '../types/cloudwatch';
 import {
   generateInitialHistory,
   generateNextDatapoint,
-  PRESET_CHAOS_SCENARIOS
+  PRESET_CHAOS_SCENARIOS,
+  getScenarioForIncident
 } from '../engine/metricGenerator';
 import { evaluateAlarm } from '../engine/alarmEvaluator';
 
@@ -46,6 +49,10 @@ interface CloudWatchContextType {
   logs: LogEvent[];
   metricHistory: Record<string, MetricDatapoint[]>;
   activeChaos: ChaosScenario[];
+  activeIncident: SimulatorIncidentType;
+  triggerIncident: (incident: SimulatorIncidentType) => void;
+  timelineEvents: SimulatorTimelineEvent[];
+  clearTimeline: () => void;
   isSimulating: boolean;
   simSpeed: number; // 1, 2, 5
   toasts: NotificationToast[];
@@ -85,6 +92,108 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [logGroups] = useState<LogGroup[]>(INITIAL_LOG_GROUPS);
   const [logs, setLogs] = useState<LogEvent[]>(INITIAL_LOG_EVENTS);
   const [activeChaos, setActiveChaos] = useState<ChaosScenario[]>([]);
+  const [activeIncident, setActiveIncident] = useState<SimulatorIncidentType>('NORMAL');
+  const [timelineEvents, setTimelineEvents] = useState<SimulatorTimelineEvent[]>(() => {
+    const now = Date.now();
+    const d1 = new Date(now - 1000 * 60 * 10);
+    const h = d1.getHours().toString().padStart(2, '0');
+    const m = d1.getMinutes().toString().padStart(2, '0');
+    return [
+      {
+        id: 'evt-init-1',
+        time: `${h}:${m}`,
+        timestamp: d1.toISOString(),
+        title: 'Normal operation',
+        type: 'NORMAL',
+        severity: 'ok',
+        description: 'Simulated environment running with standard operational traffic and telemetry.'
+      }
+    ];
+  });
+
+  const breachedMetricsRef = useRef<Set<string>>(new Set());
+
+  const pushTimelineEvent = (event: Omit<SimulatorTimelineEvent, 'id' | 'time' | 'timestamp'>) => {
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    const newEvt: SimulatorTimelineEvent = {
+      ...event,
+      id: 'timeline-' + Math.random().toString(36).substring(2, 9),
+      time: `${h}:${m}`,
+      timestamp: now.toISOString()
+    };
+    setTimelineEvents((prev) => [newEvt, ...prev.slice(0, 39)]);
+  };
+
+  const clearTimeline = () => {
+    setTimelineEvents([]);
+  };
+
+  const triggerIncident = (incident: SimulatorIncidentType) => {
+    setActiveIncident(incident);
+
+    if (incident === 'NORMAL') {
+      setActiveChaos([]);
+      pushTimelineEvent({
+        title: 'Normal operation',
+        type: 'NORMAL',
+        severity: 'ok',
+        description: 'Simulation environment set to normal steady-state operation.'
+      });
+      pushToast({
+        type: 'OK',
+        title: 'Normal Operation',
+        message: 'All metrics returning smoothly to baseline ranges.'
+      });
+    } else if (incident === 'RECOVERY') {
+      setActiveChaos([]);
+      pushTimelineEvent({
+        title: 'Recovery triggered',
+        type: 'RECOVERY_TRIGGERED',
+        severity: 'ok',
+        description: 'Mitigation initiated. Telemetry metrics will gradually return toward normal ranges.'
+      });
+      pushToast({
+        type: 'OK',
+        title: 'Recovery Initiated',
+        message: 'Metrics are gradually descending to healthy baselines.'
+      });
+    } else {
+      const scenarios = getScenarioForIncident(incident);
+      setActiveChaos(scenarios);
+
+      let title = '';
+      let desc = '';
+      if (incident === 'CPU_SPIKE') {
+        title = 'CPU Spike triggered';
+        desc = 'Heavy compute workload injected on EC2-Web-01. CPU will gradually rise: 45% → 61% → 74% → 83% → 91%.';
+      } else if (incident === 'TRAFFIC_SPIKE') {
+        title = 'Traffic Spike triggered';
+        desc = 'Surge in inbound HTTP traffic: Request count, network throughput, and CPU load increasing.';
+      } else if (incident === 'ERROR_SPIKE') {
+        title = 'Error Spike triggered';
+        desc = 'API backend failures cascading: Error count and error rate increasing.';
+      } else if (incident === 'DATABASE_LOAD') {
+        title = 'Database Load triggered';
+        desc = 'Complex join saturation: Database CPU, connection pool, and latency increasing.';
+      }
+
+      pushTimelineEvent({
+        title,
+        type: 'INCIDENT_TRIGGERED',
+        severity: 'warn',
+        description: desc
+      });
+
+      pushToast({
+        type: 'CHAOS',
+        title,
+        message: desc
+      });
+    }
+  };
+
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
@@ -158,9 +267,25 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAlarms(INITIAL_ALARMS);
     setResources(AWS_RESOURCES);
     setActiveChaos([]);
+    setActiveIncident('NORMAL');
     setLogs(INITIAL_LOG_EVENTS);
     setMetricHistory(buildInitialMetricMap());
     setPipelineAuditLogs([]);
+    breachedMetricsRef.current.clear();
+    const now = new Date();
+    const h = now.getHours().toString().padStart(2, '0');
+    const m = now.getMinutes().toString().padStart(2, '0');
+    setTimelineEvents([
+      {
+        id: 'evt-reset-' + Date.now(),
+        time: `${h}:${m}`,
+        timestamp: now.toISOString(),
+        title: 'Normal operation',
+        type: 'NORMAL',
+        severity: 'ok',
+        description: 'Simulation reset. Metrics, alarms, and baseline history restored.'
+      }
+    ]);
     pushToast({
       type: 'OK',
       title: 'Simulation Reset',
@@ -215,6 +340,26 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
           // Maintain a rolling buffer of 60 datapoints (1 hour)
           updatedMetrics[key] = [...currentPoints.slice(-59), nextPoint];
+
+          // Check for threshold breach in timeline
+          const def = METRIC_DEFINITIONS[metric];
+          if (def) {
+            if (nextPoint.value > def.defaultThreshold) {
+              if (!breachedMetricsRef.current.has(key)) {
+                breachedMetricsRef.current.add(key);
+                const metricTitle = metric === 'CPUUtilization' ? 'CPU' : def.displayName;
+                pushTimelineEvent({
+                  title: `${metricTitle} threshold breached`,
+                  type: 'THRESHOLD_BREACHED',
+                  severity: 'warn',
+                  description: `${res.name} ${def.displayName} reached ${nextPoint.value}${def.unit === 'Percent' ? '%' : ' ' + def.unit}, breaching threshold of ${def.defaultThreshold}.`,
+                  resourceId: res.id
+                });
+              }
+            } else if (nextPoint.value <= def.defaultThreshold * 0.95) {
+              breachedMetricsRef.current.delete(key);
+            }
+          }
         }
       }
 
@@ -245,6 +390,25 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               details: `${alarm.name} state changed from ${alarm.state} to ${result.updatedAlarm.state}.`,
               severity: result.updatedAlarm.state === 'ALARM' ? 'alarm' : 'info'
             });
+
+            // Log alarm transition to simulator event timeline
+            if (result.updatedAlarm.state === 'ALARM') {
+              pushTimelineEvent({
+                title: `${alarm.name} → ALARM`,
+                type: 'ALARM_TRANSITION',
+                severity: 'alarm',
+                description: `${alarm.evaluationPeriods} consecutive periods exceeded threshold. ${result.explanation}`,
+                resourceId: alarm.resourceId
+              });
+            } else if (result.updatedAlarm.state === 'OK') {
+              pushTimelineEvent({
+                title: `${alarm.name} → OK`,
+                type: 'ALARM_TRANSITION',
+                severity: 'ok',
+                description: `Metric returned below threshold for recovery periods. ${result.explanation}`,
+                resourceId: alarm.resourceId
+              });
+            }
 
             const matchedLogGroup = logGroups.find((lg) => lg.resourceId === alarm.resourceId);
             if (matchedLogGroup) {
@@ -443,6 +607,10 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       logs,
       metricHistory,
       activeChaos,
+      activeIncident,
+      triggerIncident,
+      timelineEvents,
+      clearTimeline,
       isSimulating,
       simSpeed,
       toasts,
@@ -472,6 +640,8 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       logs,
       metricHistory,
       activeChaos,
+      activeIncident,
+      timelineEvents,
       isSimulating,
       simSpeed,
       toasts,
