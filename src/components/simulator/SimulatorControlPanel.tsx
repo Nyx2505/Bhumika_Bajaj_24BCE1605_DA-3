@@ -25,10 +25,16 @@ import {
   ArrowDownRight,
   ShieldCheck,
   RefreshCw,
-  Bell
+  Bell,
+  LayoutDashboard,
+  FileText
 } from 'lucide-react';
 
-export const SimulatorControlPanel: React.FC = () => {
+interface SimulatorControlPanelProps {
+  onNavigateTab?: (tab: string, subView?: string) => void;
+}
+
+export const SimulatorControlPanel: React.FC<SimulatorControlPanelProps> = ({ onNavigateTab }) => {
   const {
     isSimulating,
     toggleSimulation,
@@ -117,7 +123,7 @@ export const SimulatorControlPanel: React.FC = () => {
         <div className="flex items-center space-x-2.5">
           <button
             onClick={toggleSimulation}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center shadow-xs ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center shadow-xs cursor-pointer ${
               isSimulating
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 : 'bg-amber-500 hover:bg-amber-400 text-black'
@@ -140,7 +146,7 @@ export const SimulatorControlPanel: React.FC = () => {
               <button
                 key={speed}
                 onClick={() => setSimSpeed(speed)}
-                className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono transition ${
+                className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono transition cursor-pointer ${
                   simSpeed === speed
                     ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-black'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -150,6 +156,75 @@ export const SimulatorControlPanel: React.FC = () => {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Connected Architecture Workflow Pipeline Bar */}
+      <div className="bg-white dark:bg-[#131921] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Connected CloudWatch Monitoring Progression
+            </h3>
+          </div>
+          {onNavigateTab && (
+            <div className="flex items-center space-x-1.5 flex-wrap">
+              <span className="text-[11px] text-slate-400 mr-1">Quick Links:</span>
+              <button
+                onClick={() => onNavigateTab('dashboard')}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-[11px] font-bold text-slate-700 dark:text-slate-200 transition flex items-center gap-1 cursor-pointer"
+              >
+                <LayoutDashboard className="w-3 h-3 text-amber-500" />
+                Dashboard Charts
+              </button>
+              <button
+                onClick={() => onNavigateTab('alarms')}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-[11px] font-bold text-slate-700 dark:text-slate-200 transition flex items-center gap-1 cursor-pointer"
+              >
+                <Bell className="w-3 h-3 text-rose-500" />
+                Alarms ({alarms.filter((a) => a.state === 'ALARM').length})
+              </button>
+              <button
+                onClick={() => onNavigateTab('logs')}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-md text-[11px] font-bold text-slate-700 dark:text-slate-200 transition flex items-center gap-1 cursor-pointer"
+              >
+                <FileText className="w-3 h-3 text-purple-500" />
+                Logs
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 8-stage visual sequence */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center text-xs">
+          {[
+            { step: '1', label: 'Simulator Event', tab: 'simulator', desc: 'Click Spike/Recovery' },
+            { step: '2', label: 'Metric Changes', tab: 'metrics', desc: 'Gradual stepping' },
+            { step: '3', label: 'Charts Update', tab: 'dashboard', desc: 'Time-series graphs' },
+            { step: '4', label: 'Evaluation', tab: 'learning', desc: 'M of N periods check' },
+            { step: '5', label: 'State Changes', tab: 'alarms', desc: 'OK ➔ ALARM' },
+            { step: '6', label: 'Logs Emitted', tab: 'logs', desc: 'Correlated streams' },
+            { step: '7', label: 'Counters Sync', tab: 'dashboard', desc: 'Dashboard badges' },
+            { step: '8', label: 'History Saved', tab: 'alarms', subView: 'history', desc: 'Audit transition' }
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              onClick={() => onNavigateTab?.(item.tab, item.subView)}
+              className="p-2.5 rounded-xl border bg-slate-50 hover:bg-amber-500/10 dark:bg-slate-900/60 dark:hover:bg-amber-500/10 border-slate-200 hover:border-amber-500/50 dark:border-slate-800 dark:hover:border-amber-500/50 cursor-pointer transition text-left group"
+            >
+              <div className="flex items-center justify-between text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">
+                <span>{item.step}</span>
+                <span className="opacity-0 group-hover:opacity-100 transition">↗</span>
+              </div>
+              <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200 mt-0.5 truncate">
+                {item.label}
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                {item.desc}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -647,6 +722,55 @@ export const SimulatorControlPanel: React.FC = () => {
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                             {evt.description}
                           </p>
+                        )}
+
+                        {onNavigateTab && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center gap-2 flex-wrap">
+                            {evt.type === 'ALARM_TRANSITION' && (
+                              <>
+                                <button
+                                  onClick={() => onNavigateTab('alarms', 'history')}
+                                  className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  View Alarm History →
+                                </button>
+                                <span className="text-slate-300 dark:text-slate-700">•</span>
+                                <button
+                                  onClick={() => onNavigateTab('logs')}
+                                  className="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  View Ingested Logs →
+                                </button>
+                              </>
+                            )}
+
+                            {evt.type === 'THRESHOLD_BREACHED' && (
+                              <>
+                                <button
+                                  onClick={() => onNavigateTab('dashboard')}
+                                  className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  View Dashboard Charts →
+                                </button>
+                                <span className="text-slate-300 dark:text-slate-700">•</span>
+                                <button
+                                  onClick={() => onNavigateTab('metrics')}
+                                  className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  Inspect Metric History →
+                                </button>
+                              </>
+                            )}
+
+                            {(evt.type === 'INCIDENT_TRIGGERED' || evt.type === 'NORMAL' || evt.type === 'RECOVERY_TRIGGERED') && (
+                              <button
+                                onClick={() => onNavigateTab('dashboard')}
+                                className="text-[10px] font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                Watch Live SVG Graphs →
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

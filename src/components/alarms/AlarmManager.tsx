@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCloudWatch } from '../../context/CloudWatchContext';
 import { METRIC_DEFINITIONS } from '../../data/initialResources';
 import { Alarm, AlarmState, ComparisonOperator, MetricStatistic } from '../../types/cloudwatch';
@@ -32,7 +32,15 @@ import {
   ReferenceLine
 } from 'recharts';
 
-export const AlarmManager: React.FC = () => {
+interface AlarmManagerProps {
+  initialView?: 'ALARMS' | 'HISTORY';
+  onNavigateTab?: (tab: string) => void;
+}
+
+export const AlarmManager: React.FC<AlarmManagerProps> = ({
+  initialView = 'ALARMS',
+  onNavigateTab
+}) => {
   const {
     alarms,
     resources,
@@ -50,7 +58,13 @@ export const AlarmManager: React.FC = () => {
   const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
   // Navigation tab within Alarms section: 'ALARMS' vs 'HISTORY'
-  const [activeView, setActiveView] = useState<'ALARMS' | 'HISTORY'>('ALARMS');
+  const [activeView, setActiveView] = useState<'ALARMS' | 'HISTORY'>(initialView);
+
+  useEffect(() => {
+    if (initialView) {
+      setActiveView(initialView);
+    }
+  }, [initialView]);
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<'ALL' | AlarmState>('ALL');

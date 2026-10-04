@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Database,
-  Sliders
+  Sliders,
+  Flame
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -45,6 +46,8 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
     metricHistory,
     totalMetricsTracked,
     resetSimulation,
+    activeIncident,
+    triggerIncident,
     theme
   } = useCloudWatch();
 
@@ -296,6 +299,110 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ================= CONNECTED SIMULATION INCIDENT STATUS BANNER ================= */}
+      {activeIncident !== 'NORMAL' && activeIncident !== 'RECOVERY' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                  Active Simulation Incident:
+                </span>
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 font-mono text-xs rounded font-bold">
+                  {activeIncident.replace('_', ' ')}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Telemetry metrics are surging in real-time. Notice the graphs rising below, crossing thresholds, evaluating consecutive periods, and triggering alarms.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => triggerIncident('RECOVERY')}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center shadow-xs cursor-pointer"
+            >
+              <CheckCircle className="w-4 h-4 mr-1.5" />
+              Trigger Recovery
+            </button>
+            <button
+              onClick={() => onNavigateTab('simulator')}
+              className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold transition flex items-center cursor-pointer"
+            >
+              <Sliders className="w-4 h-4 mr-1.5" />
+              Simulator Controls
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeIncident === 'RECOVERY' && (
+        <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-500 flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
+                  Recovery Mode Active
+                </span>
+                <span className="px-2 py-0.5 bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono text-xs rounded font-bold">
+                  Cooling Down
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Metrics are stepping down gradually towards normal operating baselines. Alarms will transition to OK once recovery evaluation criteria are met.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => triggerIncident('NORMAL')}
+              className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold transition flex items-center cursor-pointer"
+            >
+              Set Normal Steady State
+            </button>
+            <button
+              onClick={() => onNavigateTab('simulator')}
+              className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold transition flex items-center cursor-pointer"
+            >
+              <Sliders className="w-4 h-4 mr-1.5" />
+              Simulator Controls
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeIncident === 'NORMAL' && (
+        <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5 text-slate-600 dark:text-slate-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <span>
+              <strong>Environment Status:</strong> Normal Steady Operation. Telemetry within standard thresholds.
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => triggerIncident('CPU_SPIKE')}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition flex items-center shadow-2xs cursor-pointer"
+            >
+              <Flame className="w-3.5 h-3.5 mr-1" />
+              Simulate CPU Spike
+            </button>
+            <button
+              onClick={() => onNavigateTab('simulator')}
+              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-lg text-xs transition flex items-center cursor-pointer"
+            >
+              Open Simulator →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ================= CONTROLS: RESOURCE & TIME RANGE SELECTORS ================= */}
       <div className="bg-white dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">

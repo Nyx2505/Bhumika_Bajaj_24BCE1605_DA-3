@@ -18,6 +18,16 @@ export function AppLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isChaosDrawerOpen, setIsChaosDrawerOpen] = useState<boolean>(false);
   const [metricResourceFilter, setMetricResourceFilter] = useState<string | undefined>(undefined);
+  const [alarmInitialView, setAlarmInitialView] = useState<'ALARMS' | 'HISTORY'>('ALARMS');
+
+  const handleNavigateTab = (tab: string, subView?: string) => {
+    if (tab === 'alarms' && subView === 'history') {
+      setAlarmInitialView('HISTORY');
+    } else if (tab === 'alarms') {
+      setAlarmInitialView('ALARMS');
+    }
+    setCurrentTab(tab);
+  };
 
   const handleSelectResourceForMetrics = (resourceId: string) => {
     setMetricResourceFilter(resourceId);
@@ -28,7 +38,7 @@ export function AppLayout() {
     <div className="min-h-screen bg-slate-100 dark:bg-[#0b1120] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       {/* Top Application Header */}
       <Header
-        onNavigateTab={(tab) => setCurrentTab(tab)}
+        onNavigateTab={handleNavigateTab}
         openChaosDrawer={() => setIsChaosDrawerOpen(true)}
       />
 
@@ -45,20 +55,20 @@ export function AppLayout() {
         {/* Content Column */}
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           {/* Top Telemetry Flow Navigator */}
-          <PipelineNavigator onNavigateTab={(tab) => setCurrentTab(tab)} />
+          <PipelineNavigator onNavigateTab={handleNavigateTab} />
 
           {/* Main Workspace View Container */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
             {currentTab === 'dashboard' && (
               <OperationalDashboard
-                onNavigateTab={(tab) => setCurrentTab(tab)}
+                onNavigateTab={handleNavigateTab}
                 onSelectResourceForMetrics={handleSelectResourceForMetrics}
               />
             )}
 
             {currentTab === 'resources' && (
               <ResourcesManager
-                onNavigateTab={(tab) => setCurrentTab(tab)}
+                onNavigateTab={handleNavigateTab}
                 onSelectResourceForMetrics={handleSelectResourceForMetrics}
               />
             )}
@@ -67,13 +77,20 @@ export function AppLayout() {
               <MetricsExplorer initialResourceId={metricResourceFilter} />
             )}
 
-            {currentTab === 'alarms' && <AlarmManager />}
+            {currentTab === 'alarms' && (
+              <AlarmManager
+                initialView={alarmInitialView}
+                onNavigateTab={handleNavigateTab}
+              />
+            )}
 
             {currentTab === 'logs' && <LogsViewer />}
 
             {currentTab === 'learning' && <LearningLab />}
 
-            {currentTab === 'simulator' && <SimulatorControlPanel />}
+            {currentTab === 'simulator' && (
+              <SimulatorControlPanel onNavigateTab={handleNavigateTab} />
+            )}
           </main>
 
           {/* Footer */}
