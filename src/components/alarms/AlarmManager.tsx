@@ -21,16 +21,9 @@ import {
   RotateCcw,
   Info
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ReferenceLine
-} from 'recharts';
+import { AlarmCard } from './AlarmCard';
+import { AlarmStatusBadge } from './AlarmStatusBadge';
+import { MetricChart } from '../charts/MetricChart';
 
 interface AlarmManagerProps {
   initialView?: 'ALARMS' | 'HISTORY';
@@ -294,134 +287,17 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
           </div>
 
           {/* Alarm Cards List */}
-          <div className="grid grid-cols-1 gap-3">
-            {filteredAlarms.map((alarm) => {
-              const opSymbol = getOperatorSymbol(alarm.comparisonOperator);
-              const currentVal = getCurrentMetricValue(alarm);
-
-              let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-              let borderHighlight = 'border-slate-200 dark:border-slate-700';
-
-              if (alarm.state === 'ALARM') {
-                badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30';
-                borderHighlight = 'border-rose-300 dark:border-rose-900/60 hover:border-rose-500';
-              } else if (alarm.state === 'OK') {
-                badgeColor = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30';
-                borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-emerald-500/50';
-              } else if (alarm.state === 'INSUFFICIENT_DATA') {
-                badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30';
-                borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-amber-500/50';
-              }
-
-              return (
-                <div
-                  key={alarm.id}
-                  onClick={() => setSelectedAlarm(alarm)}
-                  className={`cursor-pointer bg-white dark:bg-[#1e293b] p-4 rounded-xl border ${borderHighlight} transition shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800/80 group`}
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    {/* Left: State Badge, Title, Description */}
-                    <div className="flex items-start space-x-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${badgeColor} mt-0.5`}
-                      >
-                        {alarm.state}
-                      </span>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition">
-                            {alarm.name}
-                          </h3>
-                        </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          {alarm.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Right: Key Alarm Parameters */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-sans block">RESOURCE</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {alarm.resourceId}
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-sans block">CONDITION</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {opSymbol} {alarm.threshold} ({alarm.evaluationPeriods} periods)
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-sans block">CURRENT VALUE</span>
-                        <span className="font-bold text-amber-600 dark:text-amber-400">
-                          {currentVal}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-end space-x-2">
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-400 font-sans block">STATE CHANGE</span>
-                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">
-                            {new Date(alarm.stateUpdatedTimestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit'
-                            })}
-                          </span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom: Consecutive Datapoints Evaluation Buffer & Status Reason */}
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center space-x-2 text-[11px] truncate">
-                      <span className="text-slate-400 font-semibold">Evaluation Reason:</span>
-                      <span className="font-mono text-slate-700 dark:text-slate-300 truncate">
-                        {alarm.stateReason}
-                      </span>
-                    </div>
-
-                    {/* Mini Sliding Buffer Pills */}
-                    <div className="flex items-center space-x-1.5 flex-shrink-0">
-                      <span className="text-[10px] text-slate-400 uppercase font-sans">
-                        Buffer ({alarm.evaluationBuffer.length}/{alarm.evaluationPeriods}):
-                      </span>
-                      <div className="flex items-center space-x-1">
-                        {alarm.evaluationBuffer.map((val, idx) => {
-                          const isBreaching =
-                            alarm.comparisonOperator === 'GreaterThanThreshold'
-                              ? val > alarm.threshold
-                              : alarm.comparisonOperator === 'GreaterThanOrEqualToThreshold'
-                              ? val >= alarm.threshold
-                              : alarm.comparisonOperator === 'LessThanThreshold'
-                              ? val < alarm.threshold
-                              : val <= alarm.threshold;
-
-                          return (
-                            <span
-                              key={idx}
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                isBreaching
-                                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
-                                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                              }`}
-                            >
-                              {val}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {filteredAlarms.map((alarm) => (
+              <AlarmCard
+                key={alarm.id}
+                alarm={alarm}
+                isSelected={currentSelectedAlarm?.id === alarm.id}
+                onSelect={setSelectedAlarm}
+                onDelete={deleteAlarm}
+                onTriggerTestDatapoint={(a, val) => injectDatapoint(a.resourceId, a.metricName, val)}
+              />
+            ))}
           </div>
         </div>
       ) : (
@@ -751,43 +627,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
               <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
                 Metric Evaluation vs Threshold Line
               </h4>
-              <div className="h-44 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={selectedAlarmHistory}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-                    <XAxis dataKey="time" stroke={textFill} fontSize={9} tickLine={false} />
-                    <YAxis stroke={textFill} fontSize={9} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: tooltipBg,
-                        borderColor: tooltipBorder,
-                        borderRadius: '8px',
-                        fontSize: '10px',
-                        color: isDark ? '#fff' : '#000'
-                      }}
-                    />
-                    <ReferenceLine
-                      y={currentSelectedAlarm.threshold}
-                      stroke="#ef4444"
-                      strokeDasharray="4 4"
-                      label={{
-                        value: `Threshold: ${currentSelectedAlarm.threshold}`,
-                        fill: '#ef4444',
-                        fontSize: 10,
-                        position: 'top'
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      dot={{ r: 2 }}
-                      isAnimationActive={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <MetricChart
+                data={selectedAlarmHistory}
+                lines={[{ key: 'value', color: '#f59e0b', name: currentSelectedAlarm.metricName }]}
+                threshold={currentSelectedAlarm.threshold}
+                thresholdLabel="Threshold"
+                height={175}
+                isDark={isDark}
+              />
             </div>
 
             {/* State Transition History */}

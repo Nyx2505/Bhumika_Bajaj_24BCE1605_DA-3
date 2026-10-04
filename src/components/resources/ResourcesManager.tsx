@@ -1,22 +1,8 @@
 import React, { useState } from 'react';
 import { useCloudWatch } from '../../context/CloudWatchContext';
-import { METRIC_DEFINITIONS } from '../../data/initialResources';
 import { AWSResourceType } from '../../types/cloudwatch';
-import {
-  Server,
-  Database,
-  CloudLightning,
-  Layers,
-  Search,
-  Filter,
-  ArrowUpRight,
-  Terminal,
-  Activity,
-  CheckCircle,
-  AlertTriangle,
-  RotateCcw,
-  Tag
-} from 'lucide-react';
+import { Server, Search } from 'lucide-react';
+import { ResourceCard } from './ResourceCard';
 
 interface ResourcesManagerProps {
   onNavigateTab: (tab: string) => void;
@@ -27,7 +13,7 @@ export const ResourcesManager: React.FC<ResourcesManagerProps> = ({
   onNavigateTab,
   onSelectResourceForMetrics
 }) => {
-  const { resources, metricHistory, toggleResourceHealth } = useCloudWatch();
+  const { resources, alarms, toggleResourceHealth } = useCloudWatch();
 
   const [typeFilter, setTypeFilter] = useState<'ALL' | AWSResourceType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,19 +30,6 @@ export const ResourcesManager: React.FC<ResourcesManagerProps> = ({
     }
     return true;
   });
-
-  const getResourceIcon = (type: AWSResourceType) => {
-    switch (type) {
-      case 'EC2':
-        return <Server className="w-4 h-4 text-sky-500" />;
-      case 'RDS':
-        return <Database className="w-4 h-4 text-blue-500" />;
-      case 'Lambda':
-        return <CloudLightning className="w-4 h-4 text-amber-500" />;
-      case 'ALB':
-        return <Layers className="w-4 h-4 text-purple-500" />;
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -112,144 +85,19 @@ export const ResourcesManager: React.FC<ResourcesManagerProps> = ({
       {/* Resources Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredResources.map((res) => {
-          const isDegraded = res.status === 'degraded';
-
+          const resAlarms = alarms.filter((a) => a.resourceId === res.id && a.state === 'ALARM');
           return (
-            <div
+            <ResourceCard
               key={res.id}
-              className={`bg-white dark:bg-[#1e293b] p-5 rounded-2xl border transition shadow-xs flex flex-col justify-between ${
-                isDegraded
-                  ? 'border-amber-500/80 bg-amber-50/20 dark:bg-amber-950/20'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-              }`}
-            >
-              <div>
-                {/* Top Resource Card Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                      {getResourceIcon(res.type)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                          {res.name}
-                        </h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase">
-                          {res.type}
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">
-                        {res.id} · {res.region}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status Indicator */}
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center ${
-                      res.status === 'running'
-                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
-                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 animate-pulse'
-                    }`}
-                  >
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                        res.status === 'running' ? 'bg-emerald-500' : 'bg-amber-500'
-                      }`}
-                    ></span>
-                    {res.status}
-                  </span>
-                </div>
-
-                {/* Endpoint/Address */}
-                {res.ipOrEndpoint && (
-                  <div className="mt-3 text-[11px] text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 truncate">
-                    Endpoint: {res.ipOrEndpoint}
-                  </div>
-                )}
-
-                {/* Tags */}
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {Object.entries(res.tags).map(([k, v]) => (
-                    <span
-                      key={k}
-                      className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 flex items-center"
-                    >
-                      <Tag className="w-2.5 h-2.5 mr-1 text-slate-400" />
-                      {k}: <strong className="ml-1 text-slate-800 dark:text-slate-200">{v}</strong>
-                    </span>
-                  ))}
-                </div>
-
-                {/* Live Key Metrics Snapshot */}
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-2">
-                    Live Telemetry Streams:
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {res.supportedMetrics.map((metric) => {
-                      const key = `${res.id}:${metric}`;
-                      const points = metricHistory[key] || [];
-                      const latestPoint = points[points.length - 1];
-                      const def = METRIC_DEFINITIONS[metric];
-
-                      return (
-                        <div
-                          key={metric}
-                          className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs"
-                        >
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                            {def?.displayName || metric}
-                          </div>
-                          <div className="font-mono font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-                            {latestPoint ? latestPoint.value : '--'}
-                            <span className="text-[9px] font-normal text-slate-400 ml-1">
-                              {def?.unit === 'Percent' ? '%' : ''}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Card Actions */}
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <button
-                  onClick={() => toggleResourceHealth(res.id)}
-                  className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition ${
-                    isDegraded
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                  }`}
-                  title={isDegraded ? 'Restore resource health' : 'Simulate operational degradation'}
-                >
-                  {isDegraded ? 'Restore Healthy' : 'Simulate Degradation'}
-                </button>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => onNavigateTab('logs')}
-                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition flex items-center text-[11px]"
-                    title="View Resource Logs"
-                  >
-                    <Terminal className="w-3.5 h-3.5 mr-1" />
-                    Logs
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSelectResourceForMetrics(res.id);
-                      onNavigateTab('metrics');
-                    }}
-                    className="px-2.5 py-1 rounded-md bg-slate-900 text-white dark:bg-amber-500 dark:text-black font-bold text-[11px] transition flex items-center"
-                  >
-                    Metrics <ArrowUpRight className="w-3 h-3 ml-1" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              resource={res}
+              activeAlarmsCount={resAlarms.length}
+              onToggleHealth={toggleResourceHealth}
+              onSelectMetrics={(id) => {
+                onSelectResourceForMetrics(id);
+                onNavigateTab('metrics');
+              }}
+              onViewLogs={() => onNavigateTab('logs')}
+            />
           );
         })}
       </div>

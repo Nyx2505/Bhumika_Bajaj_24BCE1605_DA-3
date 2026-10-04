@@ -1,6 +1,7 @@
 export type AWSResourceType = 'EC2' | 'Database' | 'Application' | 'RDS' | 'Lambda' | 'ALB';
 
-export interface AWSResource {
+// Core Resource Interface
+export interface Resource {
   id: string;
   name: string;
   type: AWSResourceType;
@@ -11,23 +12,32 @@ export interface AWSResource {
   supportedMetrics: string[];
 }
 
+// Backward compatibility alias
+export type AWSResource = Resource;
+
 export type ComparisonOperator = 
   | 'GreaterThanOrEqualToThreshold'
   | 'GreaterThanThreshold'
   | 'LessThanOrEqualToThreshold'
   | 'LessThanThreshold';
 
+// Alarm State
 export type AlarmState = 'OK' | 'ALARM' | 'INSUFFICIENT_DATA';
 
 export type MetricStatistic = 'Average' | 'Maximum' | 'Minimum' | 'SampleCount' | 'Sum';
 
-export interface MetricDatapoint {
+// Metric DataPoint
+export interface MetricDataPoint {
   timestamp: string; // ISO string
   value: number;
   unit: string;
 }
 
-export interface MetricDefinition {
+// Backward compatibility alias
+export type MetricDatapoint = MetricDataPoint;
+
+// Metric Definition
+export interface Metric {
   name: string;
   displayName: string;
   unit: string;
@@ -38,6 +48,10 @@ export interface MetricDefinition {
   normalMax: number;
 }
 
+// Backward compatibility alias
+export type MetricDefinition = Metric;
+
+// Alarm Interface
 export interface Alarm {
   id: string;
   name: string;
@@ -68,6 +82,7 @@ export interface Alarm {
 
 export type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
 
+// Log Event
 export interface LogEvent {
   id: string;
   timestamp: string;
@@ -102,7 +117,8 @@ export type SimulatorIncidentType =
   | 'DATABASE_LOAD'
   | 'RECOVERY';
 
-export interface SimulatorTimelineEvent {
+// Simulation Event (Timeline)
+export interface SimulationEvent {
   id: string;
   time: string; // e.g. "10:40"
   timestamp: string; // ISO string
@@ -113,6 +129,10 @@ export interface SimulatorTimelineEvent {
   resourceId?: string;
 }
 
+// Backward compatibility alias
+export type SimulatorTimelineEvent = SimulationEvent;
+
+// Learning Challenge
 export interface LearningChallenge {
   id: string;
   title: string;
@@ -138,4 +158,12 @@ export interface LearningChallenge {
     requiredComparisonOperator?: ComparisonOperator;
   };
   architectExplanation: string;
+}
+
+// Persistent User Preferences
+export interface UserPreferences {
+  theme: 'dark' | 'light';
+  simSpeed: number;
+  environment: string;
+  defaultTimeRange: '10m' | '30m' | '1h';
 }

@@ -5,20 +5,10 @@ import {
   Activity,
   Server,
   Send,
-  Filter,
-  TrendingUp,
-  BarChart2
+  Filter
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ReferenceLine
-} from 'recharts';
+import { MetricCard } from '../common/MetricCard';
+import { MetricChart } from '../charts/MetricChart';
 
 interface MetricsExplorerProps {
   initialResourceId?: string;
@@ -28,10 +18,6 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
   const { resources, metricHistory, injectDatapoint, theme } = useCloudWatch();
 
   const isDark = theme === 'dark';
-  const gridStroke = isDark ? '#334155' : '#e2e8f0';
-  const textFill = isDark ? '#94a3b8' : '#64748b';
-  const tooltipBg = isDark ? '#0f172a' : '#ffffff';
-  const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
   const [selectedResourceId, setSelectedResourceId] = useState<string>(
     initialResourceId || resources[0]?.id || ''
@@ -169,72 +155,49 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
           </div>
 
           {/* Quick Metrics KPI */}
-          <div className="flex items-center space-x-3 text-xs font-mono">
-            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 text-[10px] block">CURRENT</span>
-              <span className="text-slate-900 dark:text-white font-bold text-sm">{currentVal}</span>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 text-[10px] block">AVERAGE</span>
-              <span className="text-sky-600 dark:text-sky-300 font-bold text-sm">{avgVal}</span>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 text-[10px] block">MAX PEAK</span>
-              <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">{maxVal}</span>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 text-[10px] block">MIN</span>
-              <span className="text-slate-600 dark:text-slate-300 font-bold text-sm">{minVal}</span>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full lg:w-auto">
+            <MetricCard
+              title="CURRENT"
+              value={currentVal}
+              unit={metricDef?.unit}
+              threshold={metricDef?.defaultThreshold}
+              status={metricDef?.defaultThreshold && currentVal > metricDef.defaultThreshold ? 'breached' : 'healthy'}
+            />
+            <MetricCard
+              title="AVERAGE"
+              value={avgVal}
+              unit={metricDef?.unit}
+            />
+            <MetricCard
+              title="MAX PEAK"
+              value={maxVal}
+              unit={metricDef?.unit}
+            />
+            <MetricCard
+              title="MIN VALUE"
+              value={minVal}
+              unit={metricDef?.unit}
+            />
           </div>
         </div>
 
         {/* Chart View */}
         <div className="h-72 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="metricColor" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0284c7" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-              <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
-              <YAxis stroke={textFill} fontSize={10} tickLine={false} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: tooltipBg,
-                  borderColor: tooltipBorder,
-                  borderRadius: '8px',
-                  fontSize: '11px',
-                  color: isDark ? '#fff' : '#000'
-                }}
-              />
-              {metricDef && (
-                <ReferenceLine
-                  y={metricDef.defaultThreshold}
-                  stroke="#ef4444"
-                  strokeDasharray="4 4"
-                  label={{
-                    value: `Threshold: ${metricDef.defaultThreshold}`,
-                    fill: '#ef4444',
-                    fontSize: 10,
-                    position: 'top'
-                  }}
-                />
-              )}
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#0284c7"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#metricColor)"
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <MetricChart
+            data={chartData}
+            lines={[
+              {
+                key: 'value',
+                name: metricDef?.displayName || selectedMetric,
+                color: '#0284c7'
+              }
+            ]}
+            threshold={metricDef?.defaultThreshold}
+            thresholdLabel="Threshold"
+            height={280}
+            yAxisUnit={metricDef?.unit === 'Percent' ? 'Percent' : ''}
+            isDark={isDark}
+          />
         </div>
 
         {/* Interactive Manual Injector Section */}

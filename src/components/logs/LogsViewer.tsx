@@ -18,6 +18,7 @@ import {
   Zap
 } from 'lucide-react';
 import { LogLevel } from '../../types/cloudwatch';
+import { LogTable } from './LogTable';
 
 export const LogsViewer: React.FC = () => {
   const {
@@ -449,122 +450,8 @@ export const LogsViewer: React.FC = () => {
         </div>
       </div>
 
-      {/* Log Events Stream Terminal */}
-      <div className="bg-[#0b132b] rounded-2xl border border-slate-800 font-mono text-xs overflow-hidden shadow-xl text-slate-100">
-        {/* Terminal Header Bar */}
-        <div className="bg-[#131921] px-4 py-3 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-400 text-[11px]">
-          <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-white font-bold">
-              {selectedGroup === 'ALL' ? 'Aggregated Stream (All Groups)' : selectedGroup}
-            </span>
-            <span className="text-slate-400">
-              ({filteredLogs.length} matching events)
-            </span>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            {/* Sort order toggle */}
-            <button
-              onClick={() => setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'))}
-              className="flex items-center space-x-1 hover:text-white transition"
-              title="Toggle sort direction"
-            >
-              <ArrowUpDown className="w-3 h-3" />
-              <span>Sort: {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}</span>
-            </button>
-
-            {/* Structure legend */}
-            <span className="hidden md:inline text-slate-500">
-              Format: [Timestamp] [Resource] [Level] [Message]
-            </span>
-          </div>
-        </div>
-
-        {/* Stream Log Lines */}
-        <div
-          ref={terminalScrollRef}
-          className="p-4 max-h-[500px] overflow-y-auto space-y-2 divide-y divide-slate-800/40"
-        >
-          {filteredLogs.length === 0 ? (
-            <div className="text-center py-12 space-y-3">
-              <Terminal className="w-8 h-8 text-slate-600 mx-auto" />
-              <p className="text-slate-400 font-sans text-xs">
-                No log events matched your current search and filter criteria.
-              </p>
-              {isFilterActive && (
-                <button
-                  onClick={handleClearFilters}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs transition inline-flex items-center space-x-1.5"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset All Filters</span>
-                </button>
-              )}
-            </div>
-          ) : (
-            filteredLogs.map((log) => {
-              // Level badge colors
-              let levelBadge = 'text-sky-400 bg-sky-950/60 border-sky-800';
-              if (log.level === 'WARNING') levelBadge = 'text-amber-400 bg-amber-950/60 border-amber-800';
-              if (log.level === 'ERROR') levelBadge = 'text-rose-400 bg-rose-950/60 border-rose-800';
-
-              const isAlarmTransition = log.message.includes('AlarmTransition');
-              const isChaos = log.message.includes('SIMULATED_CHAOS_EVENT') || log.message.includes('Elevated workload');
-
-              return (
-                <div
-                  key={log.id}
-                  className={`pt-2 p-2.5 rounded-lg border transition ${
-                    isAlarmTransition
-                      ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
-                      : isChaos
-                      ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
-                      : log.level === 'ERROR'
-                      ? 'bg-rose-950/20 border-rose-900/60 text-slate-100 hover:border-rose-700'
-                      : 'bg-slate-900/40 border-slate-800/80 text-slate-200 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-2.5">
-                    {/* Timestamp (e.g. 10:41:02) */}
-                    <div className="flex items-center space-x-1.5 shrink-0 text-slate-400 text-[11px] font-mono" title={new Date(log.timestamp).toISOString()}>
-                      <Clock className="w-3 h-3 text-slate-500" />
-                      <span className="font-semibold text-slate-300">
-                        {formatTimeOnly(log.timestamp)}
-                      </span>
-                    </div>
-
-                    {/* Resource identifier */}
-                    <div className="shrink-0 flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-300 font-mono">
-                      <Server className="w-3 h-3 text-sky-400" />
-                      <span>{log.resourceId}</span>
-                    </div>
-
-                    {/* Level Badge (INFO, WARNING, ERROR) */}
-                    <div className="shrink-0">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${levelBadge}`}
-                      >
-                        {log.level}
-                      </span>
-                    </div>
-
-                    {/* Stream Tag */}
-                    <span className="shrink-0 text-[10px] text-slate-500 font-mono hidden lg:inline">
-                      {log.logGroupName}
-                    </span>
-
-                    {/* Message Body */}
-                    <div className="flex-1 text-xs leading-relaxed break-words font-mono">
-                      {log.message}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+      {/* Reusable Component: LogTable */}
+      <LogTable logs={filteredLogs} searchQuery={searchQuery} maxHeight="520px" />
 
       {/* Manual Test Log Ingestion Form */}
       <div className="bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-3">

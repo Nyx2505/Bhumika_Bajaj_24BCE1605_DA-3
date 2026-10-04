@@ -18,17 +18,8 @@ import {
   Sliders,
   Flame
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ReferenceLine,
-  CartesianGrid,
-  Legend
-} from 'recharts';
+import { MetricChart } from '../charts/MetricChart';
+import { AlarmStatusBadge } from '../alarms/AlarmStatusBadge';
 
 interface OperationalDashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -52,10 +43,6 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
   } = useCloudWatch();
 
   const isDark = theme === 'dark';
-  const gridStroke = isDark ? '#334155' : '#e2e8f0';
-  const textFill = isDark ? '#94a3b8' : '#64748b';
-  const tooltipBg = isDark ? '#0f172a' : '#ffffff';
-  const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
   // Filters state
   const [selectedResource, setSelectedResource] = useState<string>('ALL');
@@ -475,59 +462,19 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
           </div>
 
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={cpuChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-                <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
-                <YAxis stroke={textFill} fontSize={10} domain={[0, 100]} unit="%" tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: tooltipBg,
-                    borderColor: tooltipBorder,
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: isDark ? '#fff' : '#000'
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                <ReferenceLine
-                  y={80}
-                  stroke="#ef4444"
-                  strokeDasharray="4 4"
-                  label={{ value: 'Alarm Threshold 80%', fill: '#ef4444', fontSize: 10, position: 'top' }}
-                />
-                {(selectedResource === 'ALL' || selectedResource === 'EC2-Web-01') && (
-                  <Line
-                    type="monotone"
-                    dataKey="EC2-Web-01"
-                    stroke="#0284c7"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-                {(selectedResource === 'ALL' || selectedResource === 'EC2-Web-02') && (
-                  <Line
-                    type="monotone"
-                    dataKey="EC2-Web-02"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-                {(selectedResource === 'ALL' || selectedResource === 'Database-01') && (
-                  <Line
-                    type="monotone"
-                    dataKey="Database-01"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
+            <MetricChart
+              data={cpuChartData}
+              lines={[
+                ...(selectedResource === 'ALL' || selectedResource === 'EC2-Web-01' ? [{ key: 'EC2-Web-01', color: '#0284c7' }] : []),
+                ...(selectedResource === 'ALL' || selectedResource === 'EC2-Web-02' ? [{ key: 'EC2-Web-02', color: '#10b981' }] : []),
+                ...(selectedResource === 'ALL' || selectedResource === 'Database-01' ? [{ key: 'Database-01', color: '#f59e0b' }] : [])
+              ]}
+              threshold={80}
+              thresholdLabel="Alarm Threshold 80%"
+              height={240}
+              yAxisUnit="Percent"
+              isDark={isDark}
+            />
           </div>
         </div>
 
@@ -553,53 +500,16 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
           </div>
 
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={requestChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-                <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
-                <YAxis stroke={textFill} fontSize={10} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: tooltipBg,
-                    borderColor: tooltipBorder,
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: isDark ? '#fff' : '#000'
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                {(selectedResource === 'ALL' || selectedResource === 'EC2-Web-01') && (
-                  <Line
-                    type="monotone"
-                    dataKey="EC2-Web-01"
-                    stroke="#0284c7"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-                {(selectedResource === 'ALL' || selectedResource === 'EC2-Web-02') && (
-                  <Line
-                    type="monotone"
-                    dataKey="EC2-Web-02"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-                {(selectedResource === 'ALL' || selectedResource === 'Application-Server-01') && (
-                  <Line
-                    type="monotone"
-                    dataKey="Application-Server-01"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
+            <MetricChart
+              data={requestChartData}
+              lines={[
+                ...(selectedResource === 'ALL' || selectedResource === 'EC2-Web-01' ? [{ key: 'EC2-Web-01', color: '#0284c7' }] : []),
+                ...(selectedResource === 'ALL' || selectedResource === 'EC2-Web-02' ? [{ key: 'EC2-Web-02', color: '#10b981' }] : []),
+                ...(selectedResource === 'ALL' || selectedResource === 'Application-Server-01' ? [{ key: 'Application-Server-01', color: '#8b5cf6' }] : [])
+              ]}
+              height={240}
+              isDark={isDark}
+            />
           </div>
         </div>
 
@@ -625,36 +535,15 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
           </div>
 
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={errorRateChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-                <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
-                <YAxis stroke={textFill} fontSize={10} domain={[0, 'dataMax + 2']} unit="%" tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: tooltipBg,
-                    borderColor: tooltipBorder,
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: isDark ? '#fff' : '#000'
-                  }}
-                />
-                <ReferenceLine
-                  y={5}
-                  stroke="#ef4444"
-                  strokeDasharray="4 4"
-                  label={{ value: 'Alarm Threshold 5.0%', fill: '#ef4444', fontSize: 10, position: 'top' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Error Rate (%)"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  dot={{ r: 2, fill: '#ef4444' }}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <MetricChart
+              data={errorRateChartData}
+              lines={[{ key: 'Error Rate (%)', color: '#ef4444' }]}
+              threshold={5}
+              thresholdLabel="Alarm Threshold 5.0%"
+              height={240}
+              yAxisUnit="Percent"
+              isDark={isDark}
+            />
           </div>
         </div>
 
@@ -680,39 +569,15 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
           </div>
 
           <div className="h-60 w-full mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={networkChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
-                <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
-                <YAxis stroke={textFill} fontSize={10} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: tooltipBg,
-                    borderColor: tooltipBorder,
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: isDark ? '#fff' : '#000'
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="Network In (MB)"
-                  stroke="#38bdf8"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Network Out (MB)"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <MetricChart
+              data={networkChartData}
+              lines={[
+                { key: 'Network In (MB)', color: '#38bdf8' },
+                { key: 'Network Out (MB)', color: '#6366f1' }
+              ]}
+              height={240}
+              isDark={isDark}
+            />
           </div>
         </div>
       </div>
@@ -777,20 +642,7 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase font-mono">
                       {res.type}
                     </span>
-                    <span
-                      className={`text-[11px] font-bold flex items-center ${
-                        hasBreach
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-emerald-600 dark:text-emerald-400'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                          hasBreach ? 'bg-rose-500 animate-ping' : 'bg-emerald-500'
-                        }`}
-                      ></span>
-                      {hasBreach ? 'ALARM' : 'OK'}
-                    </span>
+                    <AlarmStatusBadge state={hasBreach ? 'ALARM' : 'OK'} size="sm" />
                   </div>
 
                   <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-2 group-hover:text-amber-500 transition">
