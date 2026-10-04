@@ -4,8 +4,7 @@ import { METRIC_DEFINITIONS } from '../../data/initialResources';
 import { LEARNING_CHALLENGES } from '../../data/challenges';
 import {
   AlarmState,
-  ComparisonOperator,
-  LearningChallenge
+  ComparisonOperator
 } from '../../types/cloudwatch';
 import {
   isDatapointBreaching,
@@ -18,16 +17,9 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertTriangle,
-  HelpCircle,
   Award,
-  ChevronRight,
   Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  TrendingUp,
-  Cpu,
-  RefreshCw,
-  Info
+  RefreshCw
 } from 'lucide-react';
 
 export const LearningLab: React.FC = () => {
@@ -142,7 +134,6 @@ export const LearningLab: React.FC = () => {
       state = breaches >= challengeM ? 'ALARM' : 'OK';
     }
 
-    // Evaluate against target outcome
     let passed = true;
     let message = '';
 
@@ -177,38 +168,34 @@ export const LearningLab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-600/20 via-slate-900 to-slate-900 border border-amber-500/40 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <GraduationCap className="w-48 h-48 text-amber-400" />
-        </div>
-
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-600/20 dark:via-slate-900 dark:to-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-sm relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="bg-amber-500 text-black font-black text-xs px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="bg-amber-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Unique Enhancement
               </span>
-              <span className="text-amber-400 text-xs font-semibold">
-                AWS Solutions Architect Educational Layer
+              <span className="text-amber-600 dark:text-amber-400 text-xs font-semibold">
+                Educational CloudWatch Laboratory
               </span>
             </div>
-            <h1 className="text-2xl font-black text-white mt-1">
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
               Interactive CloudWatch Learning Lab
             </h1>
-            <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
               Experiment with sliding-window multi-period alarm evaluations ($M$ of $N$), test
               state machine transitions, and understand the architectural reasoning behind
               every CloudWatch state change.
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-xl border border-slate-700">
+          <div className="flex items-center space-x-1.5 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
             <button
               onClick={() => setLabMode('SANDBOX')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
                 labMode === 'SANDBOX'
-                  ? 'bg-amber-500 text-black shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-amber-500 text-black shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Sliders className="w-3.5 h-3.5 mr-1.5" />
@@ -216,10 +203,10 @@ export const LearningLab: React.FC = () => {
             </button>
             <button
               onClick={() => setLabMode('CHALLENGES')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
                 labMode === 'CHALLENGES'
-                  ? 'bg-amber-500 text-black shadow'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-amber-500 text-black shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Award className="w-3.5 h-3.5 mr-1.5" />
@@ -233,13 +220,13 @@ export const LearningLab: React.FC = () => {
         /* ======================== MODE A: SANDBOX LAB ======================== */
         <div className="space-y-6">
           {/* Top Configuration Controls */}
-          <div className="bg-[#1e293b] p-5 rounded-2xl border border-slate-700 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700">
-              <h2 className="text-sm font-bold text-white flex items-center">
-                <Sliders className="w-4 h-4 mr-2 text-amber-400" />
+          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                <Sliders className="w-4 h-4 mr-2 text-amber-500" />
                 1. Configure Simulated CloudWatch Alarm Parameters
               </h2>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 Adjust sliders to see live state changes
               </span>
             </div>
@@ -247,7 +234,9 @@ export const LearningLab: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
               {/* Resource */}
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Resource</label>
+                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                  Resource
+                </label>
                 <select
                   value={selectedResId}
                   onChange={(e) => {
@@ -255,7 +244,7 @@ export const LearningLab: React.FC = () => {
                     const res = resources.find((r) => r.id === e.target.value);
                     if (res) setSelectedMetric(res.supportedMetrics[0]);
                   }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
                 >
                   {resources.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -267,11 +256,13 @@ export const LearningLab: React.FC = () => {
 
               {/* Metric */}
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Metric</label>
+                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                  Metric
+                </label>
                 <select
                   value={selectedMetric}
                   onChange={(e) => setSelectedMetric(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
                 >
                   {selectedResource.supportedMetrics.map((m) => (
                     <option key={m} value={m}>
@@ -283,13 +274,13 @@ export const LearningLab: React.FC = () => {
 
               {/* Comparison Operator */}
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">
+                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
                   Comparison Operator
                 </label>
                 <select
                   value={operator}
                   onChange={(e) => setOperator(e.target.value as ComparisonOperator)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-medium"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
                 >
                   <option value="GreaterThanOrEqualToThreshold">Greater Than or Equal (≥)</option>
                   <option value="GreaterThanThreshold">Greater Than (&gt;)</option>
@@ -300,8 +291,9 @@ export const LearningLab: React.FC = () => {
 
               {/* Threshold */}
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">
-                  Threshold ({metricDef?.unit || 'Unit'}): <strong className="text-amber-400 font-mono">{threshold}</strong>
+                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                  Threshold ({metricDef?.unit || 'Unit'}):{' '}
+                  <strong className="text-amber-600 dark:text-amber-400 font-mono">{threshold}</strong>
                 </label>
                 <input
                   type="range"
@@ -315,13 +307,15 @@ export const LearningLab: React.FC = () => {
             </div>
 
             {/* M of N Evaluation Periods Selector */}
-            <div className="pt-3 border-t border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-300">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
                     Evaluation Periods (N):
                   </span>
-                  <span className="font-mono text-amber-400 font-bold">{evaluationPeriods} periods</span>
+                  <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
+                    {evaluationPeriods} periods
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -335,17 +329,17 @@ export const LearningLab: React.FC = () => {
                   }}
                   className="w-full accent-sky-500"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                   CloudWatch will observe the latest {evaluationPeriods} consecutive evaluation periods.
                 </span>
               </div>
 
-              <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+              <div className="bg-slate-50 dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-300">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
                     Datapoints to Alarm (M):
                   </span>
-                  <span className="font-mono text-amber-400 font-bold">
+                  <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
                     {datapointsToAlarm} of {evaluationPeriods}
                   </span>
                 </div>
@@ -357,7 +351,7 @@ export const LearningLab: React.FC = () => {
                   onChange={(e) => setDatapointsToAlarm(Number(e.target.value))}
                   className="w-full accent-amber-500"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
                   Alarm fires if at least {datapointsToAlarm} of the last {evaluationPeriods} datapoints breach threshold.
                 </span>
               </div>
@@ -365,21 +359,21 @@ export const LearningLab: React.FC = () => {
           </div>
 
           {/* Interactive State Machine Diagram & Live State */}
-          <div className="bg-[#1e293b] p-5 rounded-2xl border border-slate-700 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700">
-              <h2 className="text-sm font-bold text-white flex items-center">
-                <RefreshCw className="w-4 h-4 mr-2 text-sky-400" />
+          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                <RefreshCw className="w-4 h-4 mr-2 text-sky-500" />
                 2. Live CloudWatch State Machine & Sliding Window Buffer
               </h2>
               <div className="flex items-center space-x-2">
-                <span className="text-xs text-slate-400">Current Evaluated State:</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Current Evaluated State:</span>
                 <span
                   className={`px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider ${
                     sandboxState === 'ALARM'
-                      ? 'bg-red-500/20 text-red-400 border border-red-500 ring-2 ring-red-500/50'
+                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
                       : sandboxState === 'OK'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500 ring-2 ring-emerald-500/50'
-                      : 'bg-amber-500/20 text-amber-300 border border-amber-500 ring-2 ring-amber-500/50'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
                   }`}
                 >
                   {sandboxState}
@@ -393,13 +387,15 @@ export const LearningLab: React.FC = () => {
               <div
                 className={`p-4 rounded-xl border text-center transition ${
                   sandboxState === 'INSUFFICIENT_DATA'
-                    ? 'bg-amber-950/40 border-amber-500 ring-2 ring-amber-500 shadow-lg scale-105'
-                    : 'bg-slate-900/60 border-slate-800 opacity-60'
+                    ? 'bg-amber-500/10 border-amber-500 shadow-xs scale-105 ring-1 ring-amber-500'
+                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
                 }`}
               >
-                <div className="w-3 h-3 rounded-full bg-amber-400 mx-auto mb-2 animate-ping"></div>
-                <div className="font-bold text-sm text-amber-300 uppercase">INSUFFICIENT_DATA</div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 mx-auto mb-2 animate-ping"></div>
+                <div className="font-bold text-xs text-amber-700 dark:text-amber-300 uppercase">
+                  INSUFFICIENT_DATA
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Datapoints &lt; {N} evaluation periods
                 </div>
               </div>
@@ -408,13 +404,15 @@ export const LearningLab: React.FC = () => {
               <div
                 className={`p-4 rounded-xl border text-center transition ${
                   sandboxState === 'OK'
-                    ? 'bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500 shadow-lg scale-105'
-                    : 'bg-slate-900/60 border-slate-800 opacity-60'
+                    ? 'bg-emerald-500/10 border-emerald-500 shadow-xs scale-105 ring-1 ring-emerald-500'
+                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
                 }`}
               >
-                <div className="w-3 h-3 rounded-full bg-emerald-400 mx-auto mb-2"></div>
-                <div className="font-bold text-sm text-emerald-300 uppercase">OK</div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mx-auto mb-2"></div>
+                <div className="font-bold text-xs text-emerald-700 dark:text-emerald-300 uppercase">
+                  OK
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Breaching points &lt; {M} of {N}
                 </div>
               </div>
@@ -423,31 +421,35 @@ export const LearningLab: React.FC = () => {
               <div
                 className={`p-4 rounded-xl border text-center transition ${
                   sandboxState === 'ALARM'
-                    ? 'bg-red-950/40 border-red-500 ring-2 ring-red-500 shadow-lg scale-105'
-                    : 'bg-slate-900/60 border-slate-800 opacity-60'
+                    ? 'bg-rose-500/10 border-rose-500 shadow-xs scale-105 ring-1 ring-rose-500'
+                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
                 }`}
               >
-                <div className="w-3 h-3 rounded-full bg-red-500 mx-auto mb-2 animate-bounce"></div>
-                <div className="font-bold text-sm text-red-400 uppercase">ALARM</div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto mb-2 animate-bounce"></div>
+                <div className="font-bold text-xs text-rose-700 dark:text-rose-400 uppercase">
+                  ALARM
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Breaching points ≥ {M} of {N}
                 </div>
               </div>
             </div>
 
             {/* Sliding Evaluation Window Buffer Visualization */}
-            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-white uppercase tracking-wider">
+                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                   Active Sliding Evaluation Window (Last {N} Datapoints)
                 </span>
-                <span className="font-mono text-slate-400">
-                  Breaching: <strong className="text-amber-400">{breachingCount}</strong> / {M} required
+                <span className="font-mono text-slate-500 dark:text-slate-400">
+                  Breaching:{' '}
+                  <strong className="text-amber-600 dark:text-amber-400">{breachingCount}</strong> /{' '}
+                  {M} required
                 </span>
               </div>
 
               {activeWindow.length === 0 ? (
-                <div className="py-6 text-center text-slate-500 text-xs italic">
+                <div className="py-6 text-center text-slate-400 text-xs italic">
                   Evaluation buffer empty. Feed datapoints below to begin evaluation.
                 </div>
               ) : (
@@ -459,8 +461,8 @@ export const LearningLab: React.FC = () => {
                         key={idx}
                         className={`p-2.5 rounded-lg border text-center font-mono transition ${
                           isBreach
-                            ? 'bg-red-500/20 border-red-500 text-red-300 font-bold'
-                            : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                            ? 'bg-rose-500/15 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold'
+                            : 'bg-emerald-500/15 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
                         }`}
                       >
                         <div className="text-[9px] text-slate-400">Point #{idx + 1}</div>
@@ -475,28 +477,28 @@ export const LearningLab: React.FC = () => {
               )}
             </div>
 
-            {/* Explainability Engine ("Why Did This Happen?") */}
-            <div className="bg-gradient-to-r from-slate-900 to-[#131921] p-4 rounded-xl border border-amber-500/30 space-y-2">
-              <div className="flex items-center space-x-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>CloudWatch Explainability Engine: "Why did the alarm enter this state?"</span>
+            {/* Explainability Engine */}
+            <div className="bg-amber-50/50 dark:bg-slate-900/60 p-4 rounded-xl border border-amber-500/30 space-y-2">
+              <div className="flex items-center space-x-2 text-amber-700 dark:text-amber-400 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>Explainability Engine: "Why did the alarm enter this state?"</span>
               </div>
-              <p className="text-xs text-slate-200 leading-relaxed font-mono bg-black/40 p-3 rounded-lg border border-slate-800">
+              <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-mono bg-white dark:bg-black/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                 {explanationReason}
               </p>
             </div>
           </div>
 
           {/* Interactive Datapoint Feeder Section */}
-          <div className="bg-[#1e293b] p-5 rounded-2xl border border-slate-700 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700">
-              <h2 className="text-sm font-bold text-white flex items-center">
-                <Play className="w-4 h-4 mr-2 text-emerald-400" />
+          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                <Play className="w-4 h-4 mr-2 text-emerald-500" />
                 3. Interactive Datapoint Feeder (Experiment with Values)
               </h2>
               <button
                 onClick={handleResetBuffer}
-                className="text-xs text-slate-400 hover:text-white flex items-center"
+                className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center"
               >
                 <RotateCcw className="w-3 h-3 mr-1" /> Clear Buffer
               </button>
@@ -505,31 +507,31 @@ export const LearningLab: React.FC = () => {
             {/* Manual Single Value Injection */}
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-400">Value to feed:</span>
+                <span className="text-xs text-slate-600 dark:text-slate-400">Value to feed:</span>
                 <input
                   type="number"
                   value={manualInputVal}
                   onChange={(e) => setManualInputVal(Number(e.target.value))}
-                  className="w-24 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                  className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                 />
               </div>
 
               <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <button
                   onClick={() => handleFeedDatapoint(manualInputVal)}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg transition"
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg transition shadow-xs"
                 >
                   Feed Datapoint
                 </button>
                 <button
                   onClick={() => handleFeedDatapoint(threshold + 10)}
-                  className="px-3 py-1.5 bg-red-600/30 hover:bg-red-600/50 text-red-300 border border-red-500/40 text-xs font-semibold rounded-lg transition"
+                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-lg transition"
                 >
                   + Feed Breaching ({threshold + 10})
                 </button>
                 <button
                   onClick={() => handleFeedDatapoint(threshold - 15)}
-                  className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 text-xs font-semibold rounded-lg transition"
+                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-lg transition"
                 >
                   + Feed Safe ({threshold - 15})
                 </button>
@@ -537,55 +539,55 @@ export const LearningLab: React.FC = () => {
             </div>
 
             {/* Preset Diagnostic Sequences */}
-            <div className="pt-3 border-t border-slate-700/80">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                Simulate Architectural Incident Sequences:
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-2">
+                Simulate Incident Sequences:
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                 <button
                   onClick={() => handleInjectSequence([35, 40, 89, 38, 42])}
-                  className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-left text-xs transition group"
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
                 >
-                  <div className="font-bold text-white group-hover:text-amber-400">
+                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-amber-500">
                     1. Transient Spike (Cron Job)
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     [35, 40, 89, 38, 42]
                   </div>
                 </button>
 
                 <button
                   onClick={() => handleInjectSequence([45, 88, 92, 95, 99])}
-                  className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-left text-xs transition group"
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
                 >
-                  <div className="font-bold text-white group-hover:text-red-400">
+                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-rose-500">
                     2. Sustained Outage Breach
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     [45, 88, 92, 95, 99]
                   </div>
                 </button>
 
                 <button
                   onClick={() => handleInjectSequence([95, 90, 42, 38, 30])}
-                  className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-left text-xs transition group"
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
                 >
-                  <div className="font-bold text-white group-hover:text-emerald-400">
+                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-emerald-500">
                     3. Auto-Healing Recovery
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     [95, 90, 42, 38, 30]
                   </div>
                 </button>
 
                 <button
                   onClick={() => handleInjectSequence([30, 85, 32, 88, 31, 89])}
-                  className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-left text-xs transition group"
+                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
                 >
-                  <div className="font-bold text-white group-hover:text-purple-400">
+                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-purple-500">
                     4. Flapping Noise Wave
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                     [30, 85, 32, 88, 31, 89]
                   </div>
                 </button>
@@ -604,71 +606,81 @@ export const LearningLab: React.FC = () => {
                 onClick={() => handleSelectChallenge(idx)}
                 className={`p-4 rounded-xl border text-left transition ${
                   activeChallengeIdx === idx
-                    ? 'bg-slate-800 border-amber-500 shadow-md ring-1 ring-amber-500'
-                    : 'bg-[#1e293b] border-slate-700 hover:border-slate-500'
+                    ? 'bg-amber-50 dark:bg-slate-800 border-amber-500 shadow-xs ring-1 ring-amber-500'
+                    : 'bg-white dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                       ch.difficulty === 'Beginner'
-                        ? 'bg-emerald-500/20 text-emerald-300'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                         : ch.difficulty === 'Intermediate'
-                        ? 'bg-sky-500/20 text-sky-300'
-                        : 'bg-purple-500/20 text-purple-300'
+                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
+                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
                     }`}
                   >
                     {ch.difficulty}
                   </span>
                   <span className="text-xs text-slate-400">#{idx + 1}</span>
                 </div>
-                <h3 className="font-bold text-sm text-white mt-2 truncate">{ch.title}</h3>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{ch.scenario}</p>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white mt-2 truncate">
+                  {ch.title}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                  {ch.scenario}
+                </p>
               </button>
             ))}
           </div>
 
           {/* Active Challenge Card */}
-          <div className="bg-[#1e293b] p-6 rounded-2xl border border-slate-700 space-y-5">
+          <div className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-5">
             <div>
               <div className="flex items-center space-x-2">
-                <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
                   <Award className="w-5 h-5" />
                 </span>
-                <h2 className="text-base font-bold text-white">{challenge.title}</h2>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  {challenge.title}
+                </h2>
               </div>
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+              <p className="text-xs text-slate-700 dark:text-slate-300 mt-2 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                 {challenge.scenario}
               </p>
             </div>
 
             {/* Architectural Context & Objective */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
-                <span className="font-bold text-amber-300 uppercase tracking-wider block text-[10px]">
+              <div className="bg-slate-50 dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider block text-[10px]">
                   AWS Architecture Context:
                 </span>
-                <p className="text-slate-300 leading-relaxed">{challenge.architectureContext}</p>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {challenge.architectureContext}
+                </p>
               </div>
 
-              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
-                <span className="font-bold text-sky-300 uppercase tracking-wider block text-[10px]">
+              <div className="bg-slate-50 dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+                <span className="font-bold text-sky-700 dark:text-sky-300 uppercase tracking-wider block text-[10px]">
                   Challenge Objective:
                 </span>
-                <p className="text-slate-300 leading-relaxed">{challenge.objective}</p>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {challenge.objective}
+                </p>
               </div>
             </div>
 
             {/* Test Sample Stream */}
-            <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
-              <div className="text-xs text-slate-400 mb-2">
+            <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
                 Test Datapoint Stream that will be fed into your alarm:
               </div>
               <div className="flex items-center space-x-2 overflow-x-auto font-mono text-xs">
                 {challenge.sampleDatapoints.map((pt, i) => (
                   <span
                     key={i}
-                    className="px-2.5 py-1 bg-slate-800 text-amber-300 rounded border border-slate-700 font-bold"
+                    className="px-2.5 py-1 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 rounded-md border border-slate-200 dark:border-slate-700 font-bold"
                   >
                     {pt}
                   </span>
@@ -677,18 +689,20 @@ export const LearningLab: React.FC = () => {
             </div>
 
             {/* Interactive Solution Form */}
-            <div className="pt-4 border-t border-slate-700/80 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                 Your Proposed CloudWatch Alarm Configuration:
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Operator</label>
+                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                    Operator
+                  </label>
                   <select
                     value={challengeOperator}
                     onChange={(e) => setChallengeOperator(e.target.value as ComparisonOperator)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-medium"
                   >
                     <option value="GreaterThanOrEqualToThreshold">Greater Than or Equal (≥)</option>
                     <option value="GreaterThanThreshold">Greater Than (&gt;)</option>
@@ -698,17 +712,19 @@ export const LearningLab: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Threshold</label>
+                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
+                    Threshold
+                  </label>
                   <input
                     type="number"
                     value={challengeThreshold}
                     onChange={(e) => setChallengeThreshold(Number(e.target.value))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
                     Evaluation Periods (N)
                   </label>
                   <input
@@ -721,12 +737,12 @@ export const LearningLab: React.FC = () => {
                       setChallengeN(n);
                       if (challengeM > n) setChallengeM(n);
                     }}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">
+                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
                     Datapoints to Alarm (M)
                   </label>
                   <input
@@ -735,18 +751,18 @@ export const LearningLab: React.FC = () => {
                     max={challengeN}
                     value={challengeM}
                     onChange={(e) => setChallengeM(Number(e.target.value))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
                   />
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   Ready to test your alarm against the incident workload?
                 </span>
                 <button
                   onClick={handleRunChallengeEvaluation}
-                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold text-xs rounded-xl shadow-lg transition flex items-center"
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold text-xs rounded-xl shadow-md transition flex items-center"
                 >
                   <Play className="w-4 h-4 mr-1.5" />
                   Evaluate Configuration
@@ -759,20 +775,20 @@ export const LearningLab: React.FC = () => {
               <div
                 className={`p-4 rounded-xl border text-xs space-y-2 animate-fadeIn ${
                   challengeResult.passed
-                    ? 'bg-emerald-950/40 border-emerald-500 text-emerald-200'
-                    : 'bg-red-950/40 border-red-500 text-red-200'
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-rose-500/10 border-rose-500/40 text-rose-800 dark:text-rose-200'
                 }`}
               >
                 <div className="flex items-center space-x-2 font-bold text-sm">
                   {challengeResult.passed ? (
                     <>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                      <span className="text-emerald-300">Challenge Solved!</span>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Challenge Solved!</span>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="w-5 h-5 text-red-400" />
-                      <span className="text-red-300">Evaluation Failed</span>
+                      <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                      <span>Evaluation Criteria Not Satisfied</span>
                     </>
                   )}
                 </div>

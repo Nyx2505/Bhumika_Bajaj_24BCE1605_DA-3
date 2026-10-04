@@ -4,11 +4,10 @@ import { METRIC_DEFINITIONS } from '../../data/initialResources';
 import {
   Activity,
   Server,
-  Layers,
   Send,
-  Info,
-  Calendar,
-  Filter
+  Filter,
+  TrendingUp,
+  BarChart2
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -26,7 +25,13 @@ interface MetricsExplorerProps {
 }
 
 export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourceId }) => {
-  const { resources, metricHistory, injectDatapoint } = useCloudWatch();
+  const { resources, metricHistory, injectDatapoint, theme } = useCloudWatch();
+
+  const isDark = theme === 'dark';
+  const gridStroke = isDark ? '#334155' : '#e2e8f0';
+  const textFill = isDark ? '#94a3b8' : '#64748b';
+  const tooltipBg = isDark ? '#0f172a' : '#ffffff';
+  const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
   const [selectedResourceId, setSelectedResourceId] = useState<string>(
     initialResourceId || resources[0]?.id || ''
@@ -38,7 +43,6 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
     selectedResource?.supportedMetrics[0] || 'CPUUtilization'
   );
 
-  // If resource changes, ensure selected metric is supported
   const handleResourceChange = (resId: string) => {
     setSelectedResourceId(resId);
     const res = resources.find((r) => r.id === resId);
@@ -77,42 +81,48 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
 
   const getNamespace = (type: string) => {
     switch (type) {
-      case 'EC2': return 'AWS/EC2';
-      case 'RDS': return 'AWS/RDS';
-      case 'Lambda': return 'AWS/Lambda';
-      case 'ALB': return 'AWS/ApplicationELB';
-      default: return 'AWS/Custom';
+      case 'EC2':
+        return 'AWS/EC2';
+      case 'RDS':
+        return 'AWS/RDS';
+      case 'Lambda':
+        return 'AWS/Lambda';
+      case 'ALB':
+        return 'AWS/ApplicationELB';
+      default:
+        return 'AWS/Custom';
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-700/80 gap-3">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-3">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center">
-            <Activity className="w-5 h-5 text-sky-400 mr-2" />
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+            <Activity className="w-5 h-5 text-sky-500 mr-2" />
             CloudWatch Metrics Explorer
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Query time-series telemetry across AWS namespaces, dimensions, and statistical aggregations
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Analyze time-series telemetry across AWS namespaces, dimensions, and statistical aggregations
           </p>
         </div>
-        <div className="text-xs font-mono bg-slate-800 text-sky-300 px-3 py-1 rounded-md border border-slate-700">
-          Namespace: <strong className="text-white">{getNamespace(selectedResource.type)}</strong>
+        <div className="text-xs font-mono bg-slate-100 dark:bg-slate-800 text-sky-700 dark:text-sky-300 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+          Namespace: <strong className="text-slate-900 dark:text-white">{getNamespace(selectedResource.type)}</strong>
         </div>
       </div>
 
       {/* Selectors Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#1e293b] p-4 rounded-xl border border-slate-700">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center">
-            <Server className="w-3.5 h-3.5 mr-1.5 text-sky-400" />
-            1. Select AWS Resource (Dimension)
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center">
+            <Server className="w-3.5 h-3.5 mr-1.5 text-sky-500" />
+            1. Select Monitored Dimension (Target Resource)
           </label>
           <select
             value={selectedResourceId}
             onChange={(e) => handleResourceChange(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 font-medium"
           >
             {resources.map((res) => (
               <option key={res.id} value={res.id}>
@@ -123,14 +133,14 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center">
-            <Filter className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-            2. Select Metric
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center">
+            <Filter className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+            2. Select CloudWatch Metric
           </label>
           <select
             value={selectedMetric}
             onChange={(e) => setSelectedMetric(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
+            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 font-medium"
           >
             {selectedResource.supportedMetrics.map((m) => (
               <option key={m} value={m}>
@@ -142,39 +152,39 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
       </div>
 
       {/* Metric Telemetry Card & Stats */}
-      <div className="bg-[#1e293b] border border-slate-700 rounded-xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-3 border-b border-slate-700 gap-3">
+      <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-base font-bold text-white">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 {metricDef?.displayName || selectedMetric}
               </h2>
-              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                 Unit: {metricDef?.unit}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
               {metricDef?.description}
             </p>
           </div>
 
           {/* Quick Metrics KPI */}
-          <div className="flex items-center space-x-4 text-xs font-mono">
-            <div className="bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+          <div className="flex items-center space-x-3 text-xs font-mono">
+            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
               <span className="text-slate-400 text-[10px] block">CURRENT</span>
-              <span className="text-white font-bold text-sm">{currentVal}</span>
+              <span className="text-slate-900 dark:text-white font-bold text-sm">{currentVal}</span>
             </div>
-            <div className="bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
               <span className="text-slate-400 text-[10px] block">AVERAGE</span>
-              <span className="text-sky-300 font-bold text-sm">{avgVal}</span>
+              <span className="text-sky-600 dark:text-sky-300 font-bold text-sm">{avgVal}</span>
             </div>
-            <div className="bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
               <span className="text-slate-400 text-[10px] block">MAX PEAK</span>
-              <span className="text-amber-400 font-bold text-sm">{maxVal}</span>
+              <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">{maxVal}</span>
             </div>
-            <div className="bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+            <div className="bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
               <span className="text-slate-400 text-[10px] block">MIN</span>
-              <span className="text-slate-300 font-bold text-sm">{minVal}</span>
+              <span className="text-slate-600 dark:text-slate-300 font-bold text-sm">{minVal}</span>
             </div>
           </div>
         </div>
@@ -189,15 +199,16 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
                   <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.6} />
-              <XAxis dataKey="time" stroke="#94a3b8" fontSize={10} tickLine={false} />
-              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.6} />
+              <XAxis dataKey="time" stroke={textFill} fontSize={10} tickLine={false} />
+              <YAxis stroke={textFill} fontSize={10} tickLine={false} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: '#475569',
+                  backgroundColor: tooltipBg,
+                  borderColor: tooltipBorder,
                   borderRadius: '8px',
-                  fontSize: '11px'
+                  fontSize: '11px',
+                  color: isDark ? '#fff' : '#000'
                 }}
               />
               {metricDef && (
@@ -206,8 +217,8 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
                   stroke="#ef4444"
                   strokeDasharray="4 4"
                   label={{
-                    value: `Default CloudWatch Alarm Threshold: ${metricDef.defaultThreshold}`,
-                    fill: '#f87171',
+                    value: `Threshold: ${metricDef.defaultThreshold}`,
+                    fill: '#ef4444',
                     fontSize: 10,
                     position: 'top'
                   }}
@@ -216,7 +227,7 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#38bdf8"
+                stroke="#0284c7"
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#metricColor)"
@@ -227,13 +238,13 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
         </div>
 
         {/* Interactive Manual Injector Section */}
-        <div className="pt-4 border-t border-slate-700/80 bg-slate-900/60 p-4 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h4 className="text-xs font-bold text-white flex items-center">
-              <Send className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-              Manual Metric Injection (Test CloudWatch Ingestion)
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center">
+              <Send className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+              Manual Metric Injection (Test Telemetry Ingestion)
             </h4>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
               Simulate a custom telemetry datapoint to test immediate alarm evaluation on this resource.
             </p>
           </div>
@@ -244,13 +255,13 @@ export const MetricsExplorer: React.FC<MetricsExplorerProps> = ({ initialResourc
                 type="number"
                 value={manualValue}
                 onChange={(e) => setManualValue(Number(e.target.value))}
-                className="w-24 bg-slate-850 bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5 text-xs text-white font-mono focus:border-amber-500"
+                className="w-24 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:border-amber-500"
               />
               <span className="text-xs text-slate-400 font-mono">{metricDef?.unit}</span>
             </div>
             <button
               onClick={() => injectDatapoint(selectedResource.id, selectedMetric, manualValue)}
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded transition flex items-center shadow"
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded-lg transition flex items-center shadow-xs"
             >
               Inject Datapoint
             </button>
