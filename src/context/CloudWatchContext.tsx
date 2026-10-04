@@ -8,8 +8,7 @@ import {
   LogEvent,
   LogGroup,
   MetricDatapoint,
-  ChaosScenario,
-  AlarmState
+  ChaosScenario
 } from '../types/cloudwatch';
 import {
   generateInitialHistory,
@@ -56,6 +55,7 @@ interface CloudWatchContextType {
   triggerChaos: (scenarioId: string) => void;
   stopChaos: (scenarioId: string) => void;
   resetAllChaos: () => void;
+  resetSimulation: () => void;
   createAlarm: (newAlarm: Omit<Alarm, 'id' | 'state' | 'stateReason' | 'stateUpdatedTimestamp' | 'evaluationBuffer' | 'history'>) => void;
   deleteAlarm: (alarmId: string) => void;
   injectDatapoint: (resourceId: string, metricName: string, value: number) => void;
@@ -64,16 +64,16 @@ interface CloudWatchContextType {
   setActivePipelineStep: (step: string) => void;
   pipelineAuditLogs: PipelineAuditLog[];
   toggleResourceHealth: (resourceId: string) => void;
+  totalMetricsTracked: number;
 }
 
 const CloudWatchContext = createContext<CloudWatchContextType | undefined>(undefined);
 
 export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Theme state with localStorage persistence
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('cw_theme');
     if (saved === 'light' || saved === 'dark') return saved;
-    return 'dark'; // Default to dark for cloud monitoring dashboard
+    return 'dark';
   });
 
   const [environment, setEnvironment] = useState<string>('Production (us-east-1)');
@@ -106,17 +106,21 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Initialize metric history for each resource's metrics
-  const [metricHistory, setMetricHistory] = useState<Record<string, MetricDatapoint[]>>(() => {
+  // Helper to build initial stable telemetry map
+  const buildInitialMetricMap = () => {
     const initialMap: Record<string, MetricDatapoint[]> = {};
     for (const res of AWS_RESOURCES) {
       for (const metric of res.supportedMetrics) {
         const key = `${res.id}:${metric}`;
-        initialMap[key] = generateInitialHistory(res.id, metric, 25, 60);
+        // 60 datapoints = 60 minutes of initial history
+        initialMap[key] = generateInitialHistory(res.id, metric, 60, 60);
       }
     }
     return initialMap;
-  });
+  };
+
+  // Initialize metric history for each resource's metrics
+  const [metricHistory, setMetricHistory] = useState<Record<string, MetricDatapoint[]>>(buildInitialMetricMap);
 
   // Save alarms to localStorage
   useEffect(() => {
@@ -148,6 +152,22 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
+  // Reset simulation function
+  const resetSimulation = () => {
+    localStorage.removeItem('cloudwatch_sim_alarms');
+    setAlarms(INITIAL_ALARMS);
+    setResources(AWS_RESOURCES);
+    setActiveChaos([]);
+    setLogs(INITIAL_LOG_EVENTS);
+    setMetricHistory(buildInitialMetricMap());
+    setPipelineAuditLogs([]);
+    pushToast({
+      type: 'OK',
+      title: 'Simulation Reset',
+      message: 'All telemetry, metrics history, alarms, and chaos incidents have been restored to initial baseline.'
+    });
+  };
+
   // Main simulation tick loop
   useEffect(() => {
     if (!isSimulating) return;
@@ -161,9 +181,8 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const newLogsToAppend: LogEvent[] = [];
       const newAuditEntries: PipelineAuditLog[] = [];
 
-      // 1. Generate new datapoints for all resources
+      // 1. Generate new datapoint for each resource metric
       for (const res of resources) {
-        // If resource is stopped, don't generate telemetry
         if (res.status === 'stopped') continue;
 
         for (const metric of res.supportedMetrics) {
@@ -171,7 +190,6 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const currentPoints = metricHistory[key] || [];
           const lastPoint = currentPoints[currentPoints.length - 1];
 
-          // Degraded resources get elevated metrics
           const isDegraded = res.status === 'degraded';
           const effectiveChaos = isDegraded
             ? [
@@ -179,7 +197,7 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 {
                   id: 'degraded-' + res.id,
                   name: `${res.name} Degraded State`,
-                  description: 'Resource experiencing operational impairment',
+                  description: 'Resource operational degradation active',
                   resourceId: res.id,
                   metricTarget: metric,
                   multiplier: 2.0,
@@ -195,8 +213,8 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             effectiveChaos
           );
 
-          // Keep sliding window of last 30 datapoints
-          updatedMetrics[key] = [...currentPoints.slice(-29), nextPoint];
+          // Maintain a rolling buffer of 60 datapoints (1 hour)
+          updatedMetrics[key] = [...currentPoints.slice(-59), nextPoint];
         }
       }
 
@@ -213,14 +231,12 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const result = evaluateAlarm(alarm, latestPoint.value, nowIso);
 
           if (result.stateChanged) {
-            // Toast notification
             pushToast({
               type: result.updatedAlarm.state,
               title: `Alarm State Transition: ${alarm.name}`,
               message: `${alarm.state} ➔ ${result.updatedAlarm.state} (${result.explanation})`
             });
 
-            // Pipeline audit entry
             newAuditEntries.push({
               id: 'audit-' + Math.random().toString(36).substring(2, 9),
               timestamp: nowIso,
@@ -230,7 +246,6 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               severity: result.updatedAlarm.state === 'ALARM' ? 'alarm' : 'info'
             });
 
-            // Correlate to CloudWatch Logs: automatically generate alarm state transition log!
             const matchedLogGroup = logGroups.find((lg) => lg.resourceId === alarm.resourceId);
             if (matchedLogGroup) {
               newLogsToAppend.push({
@@ -270,7 +285,7 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setActiveChaos((prev) => [...prev, scenario]);
       pushToast({
         type: 'CHAOS',
-        title: `Chaos Incident Started: ${scenario.name}`,
+        title: `Chaos Incident Injected: ${scenario.name}`,
         message: scenario.description
       });
 
@@ -343,7 +358,7 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     setMetricHistory((prev) => ({
       ...prev,
-      [key]: [...(prev[key] || []).slice(-29), newPoint]
+      [key]: [...(prev[key] || []).slice(-59), newPoint]
     }));
 
     setAlarms((prevAlarms) =>
@@ -375,6 +390,10 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ]);
   };
 
+  const totalMetricsTracked = useMemo(() => {
+    return resources.reduce((acc, r) => acc + r.supportedMetrics.length, 0);
+  }, [resources]);
+
   const value = useMemo(
     () => ({
       theme,
@@ -397,6 +416,7 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       triggerChaos,
       stopChaos,
       resetAllChaos,
+      resetSimulation,
       createAlarm,
       deleteAlarm,
       injectDatapoint,
@@ -404,7 +424,8 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       activePipelineStep,
       setActivePipelineStep,
       pipelineAuditLogs,
-      toggleResourceHealth
+      toggleResourceHealth,
+      totalMetricsTracked
     }),
     [
       theme,
@@ -419,7 +440,8 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       simSpeed,
       toasts,
       activePipelineStep,
-      pipelineAuditLogs
+      pipelineAuditLogs,
+      totalMetricsTracked
     ]
   );
 

@@ -1,4 +1,4 @@
-export type AWSResourceType = 'EC2' | 'RDS' | 'Lambda' | 'ALB';
+export type AWSResourceType = 'EC2' | 'Database' | 'Application' | 'RDS' | 'Lambda' | 'ALB';
 
 export interface AWSResource {
   id: string;

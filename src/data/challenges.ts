@@ -8,7 +8,7 @@ export const LEARNING_CHALLENGES: LearningChallenge[] = [
     scenario: 'Your production web server runs periodic background cache refreshes that spike CPU to 85% for 30 seconds before dropping back down to 30%. The current alarm fires and clears repeatedly, causing alert fatigue for the DevOps team.',
     architectureContext: 'AWS Well-Architected Operational Excellence Pillar recommends calibrating alarm evaluation windows to distinguish between transient load spikes and sustained outages.',
     objective: 'Reconfigure the alarm evaluation periods so that 1 or 2 brief spikes do NOT trigger the alarm, but sustained load does. Require at least 3 evaluation periods (N ≥ 3) and M ≥ 3 datapoints to alarm.',
-    resourceId: 'i-0a812fec99',
+    resourceId: 'EC2-Web-01',
     metricName: 'CPUUtilization',
     initialConfig: {
       threshold: 80,
@@ -33,7 +33,7 @@ export const LEARNING_CHALLENGES: LearningChallenge[] = [
     scenario: 'A newly deployed microservice has a bug where PostgreSQL database connections are not being closed. Connections are linearly climbing from 25 to over 90. We need to catch this breach before RDS reaches its hard maximum connection limit (100).',
     architectureContext: 'In AWS RDS monitoring, database connection saturation leads to dropped queries and cascading 504 Gateway Timeouts across the Application Load Balancer.',
     objective: 'Set a threshold between 70 and 80 connections, with 2 out of 3 evaluation periods (M=2, N=3) using GreaterThanThreshold. The alarm must transition to ALARM on sustained connection growth.',
-    resourceId: 'db-orders-postgres',
+    resourceId: 'Database-01',
     metricName: 'DatabaseConnections',
     initialConfig: {
       threshold: 95,
@@ -59,7 +59,7 @@ export const LEARNING_CHALLENGES: LearningChallenge[] = [
     scenario: 'You want to reduce AWS bill costs by terminating idle EC2 worker instances when queue traffic diminishes. However, scaling in prematurely causes instance thrashing (rapidly killing and rebooting instances), increasing cold-start latency.',
     architectureContext: 'AWS Auto Scaling best practices advise applying a conservative evaluation period (e.g. 5 consecutive periods) for scale-in alarms to verify workload depletion before terminating compute resources.',
     objective: 'Configure a scale-in alarm for CPU Utilization below 15% using LessThanThreshold. Require 5 evaluation periods (N=5) and 5 datapoints to alarm (M=5).',
-    resourceId: 'i-09bc83a152',
+    resourceId: 'EC2-Web-02',
     metricName: 'CPUUtilization',
     initialConfig: {
       threshold: 50,
