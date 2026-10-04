@@ -2,94 +2,124 @@ import { LogGroup, LogEvent } from '../types/cloudwatch';
 
 export const INITIAL_LOG_GROUPS: LogGroup[] = [
   {
-    name: '/aws/ec2/EC2-Web-01',
+    name: '/application/web',
     resourceId: 'EC2-Web-01',
     storedBytes: 15482000,
     retentionInDays: 30
   },
   {
-    name: '/aws/ec2/EC2-Web-02',
-    resourceId: 'EC2-Web-02',
-    storedBytes: 14120000,
-    retentionInDays: 30
+    name: '/application/api',
+    resourceId: 'Application-Server-01',
+    storedBytes: 28900000,
+    retentionInDays: 14
   },
   {
-    name: '/aws/rds/Database-01',
+    name: '/database/main',
     resourceId: 'Database-01',
     storedBytes: 42100000,
     retentionInDays: 60
   },
   {
-    name: '/aws/apps/Application-Server-01',
-    resourceId: 'Application-Server-01',
-    storedBytes: 28900000,
-    retentionInDays: 14
+    name: '/system/ec2-web-01',
+    resourceId: 'EC2-Web-01',
+    storedBytes: 12400000,
+    retentionInDays: 30
+  },
+  {
+    name: '/system/ec2-web-02',
+    resourceId: 'EC2-Web-02',
+    storedBytes: 11800000,
+    retentionInDays: 30
   }
 ];
 
 export const INITIAL_LOG_EVENTS: LogEvent[] = [
   {
     id: 'log-101',
-    timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/ec2/EC2-Web-01',
+    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
     resourceId: 'EC2-Web-01',
-    message: '[systemd] Started NGINX HTTP and reverse proxy server. Worker threads spawned: 8.'
+    level: 'INFO',
+    logGroupName: '/system/ec2-web-01',
+    message: 'Systemd daemon initialized. Web tier nginx worker threads spawned successfully.'
   },
   {
     id: 'log-102',
-    timestamp: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/ec2/EC2-Web-01',
+    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     resourceId: 'EC2-Web-01',
-    message: '172.31.16.42 - GET /api/v1/health HTTP/1.1 200 1.82ms "ELB-HealthChecker/2.0"'
+    level: 'INFO',
+    logGroupName: '/application/web',
+    message: 'Request received: GET /catalog HTTP/1.1 from 198.51.100.24 - 200 OK (latency: 3.2ms)'
   },
   {
     id: 'log-103',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/ec2/EC2-Web-02',
-    resourceId: 'EC2-Web-02',
-    message: '172.31.28.105 - GET /api/v1/catalog HTTP/1.1 200 4.12ms "Mozilla/5.0"'
+    timestamp: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+    resourceId: 'EC2-Web-01',
+    level: 'WARNING',
+    logGroupName: '/system/ec2-web-01',
+    message: 'CPU utilization approaching threshold (74.8% measured across cores)'
   },
   {
     id: 'log-104',
-    timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/rds/Database-01',
-    resourceId: 'Database-01',
-    message: 'LOG: checkpoint starting: time'
+    timestamp: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
+    resourceId: 'EC2-Web-01',
+    level: 'ERROR',
+    logGroupName: '/application/web',
+    message: 'Request timeout: Upstream socket timed out after 5000ms on /api/v1/checkout'
   },
   {
     id: 'log-105',
-    timestamp: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/rds/Database-01',
+    timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
     resourceId: 'Database-01',
-    message: 'LOG: checkpoint complete: wrote 412 buffers (0.8%); 0 WAL file(s) added, 0 removed, 1 recycled; duration 4.12s'
+    level: 'INFO',
+    logGroupName: '/database/main',
+    message: 'Checkpoint starting: time-based schedule checkpoint running'
   },
   {
     id: 'log-106',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    level: 'INFO',
-    logGroupName: '/aws/apps/Application-Server-01',
-    resourceId: 'Application-Server-01',
-    message: '[express] Handled POST /api/v1/orders - Order #ORD-8491 created successfully (latency: 78ms)'
+    timestamp: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
+    resourceId: 'Database-01',
+    level: 'WARNING',
+    logGroupName: '/database/main',
+    message: 'Connection pool saturation: 68 of 80 pool connections currently leased'
   },
   {
     id: 'log-107',
-    timestamp: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
-    level: 'WARN',
-    logGroupName: '/aws/apps/Application-Server-01',
+    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
     resourceId: 'Application-Server-01',
-    message: '[express] Upstream database query pool latency exceeded 120ms on read query for customer #CUST-9128'
+    level: 'INFO',
+    logGroupName: '/application/api',
+    message: 'POST /api/v1/orders - Order #ORD-9842 verified and pushed to fulfillment queue'
   },
   {
     id: 'log-108',
-    timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
+    timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    resourceId: 'Application-Server-01',
+    level: 'WARNING',
+    logGroupName: '/application/api',
+    message: 'Response time degradation: 99th percentile response time reached 340ms'
+  },
+  {
+    id: 'log-109',
+    timestamp: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+    resourceId: 'Application-Server-01',
+    level: 'ERROR',
+    logGroupName: '/application/api',
+    message: 'Unhandled Exception: DatabaseQueryTimeoutException while fetching customer profile #9218'
+  },
+  {
+    id: 'log-110',
+    timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+    resourceId: 'EC2-Web-02',
     level: 'INFO',
-    logGroupName: '/aws/ec2/EC2-Web-01',
+    logGroupName: '/system/ec2-web-02',
+    message: 'Healthcheck ping passed: 200 OK received from Application Load Balancer target group'
+  },
+  {
+    id: 'log-111',
+    timestamp: new Date(Date.now() - 1000 * 60 * 1).toISOString(),
     resourceId: 'EC2-Web-01',
-    message: '172.31.16.42 - POST /api/v1/auth/token HTTP/1.1 200 12.4ms'
+    level: 'INFO',
+    logGroupName: '/application/web',
+    message: 'Request received: POST /auth/login HTTP/1.1 200 8.4ms'
   }
 ];

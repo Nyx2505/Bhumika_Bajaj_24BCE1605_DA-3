@@ -263,6 +263,23 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       });
 
+      // 3. When chaos is active, emit periodic correlated log entries
+      if (activeChaos.length > 0 && Math.random() < 0.4) {
+        const scenario = activeChaos[Math.floor(Math.random() * activeChaos.length)];
+        const matchedLg = logGroups.find((lg) => lg.resourceId === scenario.resourceId) || logGroups[0];
+        const isErr = Math.random() > 0.5;
+        newLogsToAppend.push({
+          id: 'log-' + Math.random().toString(36).substring(2, 9),
+          timestamp: nowIso,
+          level: isErr ? 'ERROR' : 'WARNING',
+          logGroupName: matchedLg.name,
+          resourceId: scenario.resourceId,
+          message: isErr
+            ? `Request timeout: Upstream worker pool under pressure on ${scenario.resourceId} (${scenario.metricTarget} elevated).`
+            : `CPU utilization approaching threshold on ${scenario.resourceId} (active surge detected).`
+        });
+      }
+
       if (newLogsToAppend.length > 0) {
         setLogs((prev) => [...prev, ...newLogsToAppend]);
       }
@@ -289,20 +306,39 @@ export const CloudWatchProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         message: scenario.description
       });
 
-      const matchedLg = logGroups.find((lg) => lg.resourceId === scenario.resourceId);
-      if (matchedLg) {
-        setLogs((prev) => [
-          ...prev,
-          {
-            id: 'log-chaos-' + Date.now(),
-            timestamp: new Date().toISOString(),
-            level: 'WARN',
-            logGroupName: matchedLg.name,
-            resourceId: scenario.resourceId,
-            message: `[SIMULATED_CHAOS_EVENT] Injected spike: ${scenario.name}. Target: ${scenario.metricTarget}, multiplier: ${scenario.multiplier}x.`
-          }
-        ]);
-      }
+      const matchedLg = logGroups.find((lg) => lg.resourceId === scenario.resourceId) || logGroups[0];
+      const now = Date.now();
+      
+      // Correlated log sequence illustrating connected workflow:
+      // Incident/Spike -> Metric Rises -> Alarms Evaluate -> Correlated Log Stream Output
+      const correlatedLogs: LogEvent[] = [
+        {
+          id: 'log-spike-info-' + now,
+          timestamp: new Date(now - 3000).toISOString(),
+          level: 'INFO',
+          logGroupName: matchedLg.name,
+          resourceId: scenario.resourceId,
+          message: `Elevated workload detected on ${scenario.resourceId}. Request arrival velocity spiked (${scenario.name}).`
+        },
+        {
+          id: 'log-spike-warn-' + now,
+          timestamp: new Date(now - 1500).toISOString(),
+          level: 'WARNING',
+          logGroupName: matchedLg.name,
+          resourceId: scenario.resourceId,
+          message: `${scenario.metricTarget} approaching threshold on ${scenario.resourceId}. Measured load exceeding standard baseline.`
+        },
+        {
+          id: 'log-spike-err-' + now,
+          timestamp: new Date(now).toISOString(),
+          level: 'ERROR',
+          logGroupName: matchedLg.name,
+          resourceId: scenario.resourceId,
+          message: `Request timeout: Upstream worker pool under pressure on ${scenario.resourceId} (${scenario.name}).`
+        }
+      ];
+
+      setLogs((prev) => [...prev, ...correlatedLogs]);
     }
   };
 

@@ -66,11 +66,13 @@ export interface Alarm {
   };
 }
 
+export type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
+
 export interface LogEvent {
   id: string;
   timestamp: string;
   message: string;
-  level: 'INFO' | 'WARN' | 'ERROR';
+  level: LogLevel;
   logGroupName: string;
   resourceId: string;
 }
