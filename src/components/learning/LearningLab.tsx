@@ -1,803 +1,878 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCloudWatch } from '../../context/CloudWatchContext';
 import { METRIC_DEFINITIONS } from '../../data/initialResources';
-import { LEARNING_CHALLENGES } from '../../data/challenges';
 import {
   AlarmState,
-  ComparisonOperator
+  ComparisonOperator,
+  MetricStatistic
 } from '../../types/cloudwatch';
 import {
   isDatapointBreaching,
-  formatOperator
+  getOperatorSymbol
 } from '../../engine/alarmEvaluator';
 import {
   GraduationCap,
   Sliders,
-  Play,
-  RotateCcw,
   CheckCircle2,
+  XCircle,
   AlertTriangle,
-  Award,
+  RotateCcw,
   Sparkles,
-  RefreshCw
+  Zap,
+  TrendingUp,
+  Award,
+  Plus,
+  Trash2,
+  Check,
+  ChevronRight,
+  Info
 } from 'lucide-react';
 
+interface SimulatedPeriod {
+  id: number;
+  value: number;
+}
+
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  testValues: number[];
+  validate: (config: {
+    resourceId: string;
+    metricName: string;
+    operator: ComparisonOperator;
+    threshold: number;
+    evaluationPeriods: number;
+  }) => boolean;
+  hint: string;
+}
+
 export const LearningLab: React.FC = () => {
-  const { resources } = useCloudWatch();
+  const { resources, theme } = useCloudWatch();
 
-  // Mode: Sandbox Lab vs Architectural Challenges
-  const [labMode, setLabMode] = useState<'SANDBOX' | 'CHALLENGES'>('SANDBOX');
-
-  // --- SANDBOX STATE ---
-  const [selectedResId, setSelectedResId] = useState<string>(resources[0]?.id || 'i-0a812fec99');
-  const selectedResource = resources.find((r) => r.id === selectedResId) || resources[0];
+  // ================= SECTION 1: BUILD AN ALARM STATE =================
+  const [selectedResourceId, setSelectedResourceId] = useState<string>(
+    resources[0]?.id || 'EC2-Web-01'
+  );
+  const selectedResource = resources.find((r) => r.id === selectedResourceId) || resources[0];
 
   const [selectedMetric, setSelectedMetric] = useState<string>(
     selectedResource.supportedMetrics[0] || 'CPUUtilization'
   );
-
   const metricDef = METRIC_DEFINITIONS[selectedMetric];
 
-  // Configurable Alarm Parameters
-  const [operator, setOperator] = useState<ComparisonOperator>('GreaterThanOrEqualToThreshold');
+  const [statistic, setStatistic] = useState<MetricStatistic>('Average');
+  const [operator, setOperator] = useState<ComparisonOperator>('GreaterThanThreshold');
   const [threshold, setThreshold] = useState<number>(metricDef?.defaultThreshold || 80);
-  const [evaluationPeriods, setEvaluationPeriods] = useState<number>(3); // N
-  const [datapointsToAlarm, setDatapointsToAlarm] = useState<number>(3); // M
+  const [evaluationPeriods, setEvaluationPeriods] = useState<number>(3);
+  const [alarmName, setAlarmName] = useState<string>('High-CPU-Utilization-Alarm');
 
-  // Interactive Datapoint Buffer
-  const [datapointBuffer, setDatapointBuffer] = useState<number[]>([35.2, 42.1]);
-  const [manualInputVal, setManualInputVal] = useState<number>(85);
+  // Preview state of the created alarm
+  const [activeAlarmPreview, setActiveAlarmPreview] = useState<{
+    name: string;
+    resource: string;
+    metric: string;
+    metricDisplay: string;
+    unit: string;
+    statistic: MetricStatistic;
+    operator: ComparisonOperator;
+    threshold: number;
+    evaluationPeriods: number;
+  }>({
+    name: 'High-CPU-Utilization-Alarm',
+    resource: 'EC2-Web-01',
+    metric: 'CPUUtilization',
+    metricDisplay: 'CPU Utilization',
+    unit: 'Percent',
+    statistic: 'Average',
+    operator: 'GreaterThanThreshold',
+    threshold: 80,
+    evaluationPeriods: 3
+  });
 
-  // Compute Alarm State dynamically in Sandbox
-  const N = evaluationPeriods;
-  const M = datapointsToAlarm;
-  const activeWindow = datapointBuffer.slice(-N);
-
-  let sandboxState: AlarmState = 'INSUFFICIENT_DATA';
-  let breachingCount = 0;
-  let explanationReason = '';
-
-  if (activeWindow.length < N) {
-    sandboxState = 'INSUFFICIENT_DATA';
-    explanationReason = `Insufficient Datapoints: CloudWatch requires ${N} evaluation periods before evaluating state. Currently only ${activeWindow.length} datapoints [${activeWindow.join(', ')}] exist in the window.`;
-  } else {
-    breachingCount = activeWindow.filter((val) =>
-      isDatapointBreaching(val, threshold, operator)
-    ).length;
-
-    const opText = formatOperator(operator);
-
-    if (breachingCount >= M) {
-      sandboxState = 'ALARM';
-      explanationReason = `Condition Met (ALARM): ${breachingCount} out of the last ${N} datapoints [${activeWindow.join(', ')}] were ${opText} the threshold (${threshold}). Required threshold breaches (M=${M}) was satisfied!`;
-    } else {
-      sandboxState = 'OK';
-      explanationReason = `Condition Not Met (OK): Only ${breachingCount} out of the last ${N} datapoints [${activeWindow.join(', ')}] breached the threshold. Since ${breachingCount} is less than ${M}, CloudWatch evaluates the alarm to OK.`;
-    }
-  }
-
-  const handleFeedDatapoint = (val: number) => {
-    setDatapointBuffer((prev) => [...prev, Number(val.toFixed(1))]);
-  };
-
-  const handleInjectSequence = (seq: number[]) => {
-    setDatapointBuffer(seq);
-  };
-
-  const handleResetBuffer = () => {
-    setDatapointBuffer([]);
-  };
-
-  // --- CHALLENGES STATE ---
-  const [activeChallengeIdx, setActiveChallengeIdx] = useState<number>(0);
-  const challenge = LEARNING_CHALLENGES[activeChallengeIdx];
-
-  const [challengeThreshold, setChallengeThreshold] = useState<number>(
-    challenge.initialConfig.threshold
-  );
-  const [challengeN, setChallengeN] = useState<number>(
-    challenge.initialConfig.evaluationPeriods
-  );
-  const [challengeM, setChallengeM] = useState<number>(
-    challenge.initialConfig.datapointsToAlarm
-  );
-  const [challengeOperator, setChallengeOperator] = useState<ComparisonOperator>(
-    challenge.initialConfig.comparisonOperator
-  );
-
-  const [challengeResult, setChallengeResult] = useState<{
-    tested: boolean;
-    passed: boolean;
-    finalState: AlarmState;
-    message: string;
-  } | null>(null);
-
-  const handleSelectChallenge = (idx: number) => {
-    setActiveChallengeIdx(idx);
-    const c = LEARNING_CHALLENGES[idx];
-    setChallengeThreshold(c.initialConfig.threshold);
-    setChallengeN(c.initialConfig.evaluationPeriods);
-    setChallengeM(c.initialConfig.datapointsToAlarm);
-    setChallengeOperator(c.initialConfig.comparisonOperator);
-    setChallengeResult(null);
-  };
-
-  const handleRunChallengeEvaluation = () => {
-    const c = challenge;
-    const window = c.sampleDatapoints.slice(-challengeN);
-
-    let state: AlarmState = 'INSUFFICIENT_DATA';
-    if (window.length >= challengeN) {
-      const breaches = window.filter((val) =>
-        isDatapointBreaching(val, challengeThreshold, challengeOperator)
-      ).length;
-      state = breaches >= challengeM ? 'ALARM' : 'OK';
-    }
-
-    let passed = true;
-    let message = '';
-
-    if (state !== c.targetOutcome.expectedState) {
-      passed = false;
-      message = `Alarm evaluated to ${state}, but the scenario required it to evaluate to ${c.targetOutcome.expectedState}.`;
-    } else if (
-      c.targetOutcome.minEvaluationPeriods &&
-      challengeN < c.targetOutcome.minEvaluationPeriods
-    ) {
-      passed = false;
-      message = `Evaluation periods N=${challengeN} is too low. AWS Well-Architected recommendation requires N ≥ ${c.targetOutcome.minEvaluationPeriods} to prevent flapping.`;
-    } else if (
-      c.targetOutcome.requiredComparisonOperator &&
-      challengeOperator !== c.targetOutcome.requiredComparisonOperator
-    ) {
-      passed = false;
-      message = `Incorrect comparison operator. Expected ${c.targetOutcome.requiredComparisonOperator}.`;
-    } else {
-      passed = true;
-      message = `Challenge Passed! ${c.architectExplanation}`;
-    }
-
-    setChallengeResult({
-      tested: true,
-      passed,
-      finalState: state,
-      message
+  const handleCreateAlarm = (e: React.FormEvent) => {
+    e.preventDefault();
+    setActiveAlarmPreview({
+      name: alarmName,
+      resource: selectedResourceId,
+      metric: selectedMetric,
+      metricDisplay: metricDef?.displayName || selectedMetric,
+      unit: metricDef?.unit || '',
+      statistic,
+      operator,
+      threshold,
+      evaluationPeriods
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-600/20 dark:via-slate-900 dark:to-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-sm relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="bg-amber-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Unique Enhancement
-              </span>
-              <span className="text-amber-600 dark:text-amber-400 text-xs font-semibold">
-                Educational CloudWatch Laboratory
-              </span>
-            </div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-              Interactive CloudWatch Learning Lab
-            </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              Experiment with sliding-window multi-period alarm evaluations ($M$ of $N$), test
-              state machine transitions, and understand the architectural reasoning behind
-              every CloudWatch state change.
-            </p>
-          </div>
+  // Sync metric list when resource changes
+  const handleResourceChange = (resId: string) => {
+    setSelectedResourceId(resId);
+    const res = resources.find((r) => r.id === resId);
+    if (res && !res.supportedMetrics.includes(selectedMetric)) {
+      const nextMetric = res.supportedMetrics[0];
+      setSelectedMetric(nextMetric);
+      const def = METRIC_DEFINITIONS[nextMetric];
+      if (def) setThreshold(def.defaultThreshold);
+    }
+  };
 
-          <div className="flex items-center space-x-1.5 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-            <button
-              onClick={() => setLabMode('SANDBOX')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
-                labMode === 'SANDBOX'
-                  ? 'bg-amber-500 text-black shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5 mr-1.5" />
-              Alarm Sandbox Lab
-            </button>
-            <button
-              onClick={() => setLabMode('CHALLENGES')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center ${
-                labMode === 'CHALLENGES'
-                  ? 'bg-amber-500 text-black shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5 mr-1.5" />
-              Guided Challenges ({LEARNING_CHALLENGES.length})
-            </button>
-          </div>
+  const handleMetricChange = (metric: string) => {
+    setSelectedMetric(metric);
+    const def = METRIC_DEFINITIONS[metric];
+    if (def) setThreshold(def.defaultThreshold);
+  };
+
+  // ================= SECTION 2: SIMULATE METRIC VALUES =================
+  const initialPeriods: SimulatedPeriod[] = [
+    { id: 1, value: 72 },
+    { id: 2, value: 76 },
+    { id: 3, value: 84 },
+    { id: 4, value: 88 },
+    { id: 5, value: 91 }
+  ];
+
+  const [simulatedValues, setSimulatedValues] = useState<SimulatedPeriod[]>(initialPeriods);
+
+  const handleGenerateNormalTraffic = () => {
+    const min = metricDef ? metricDef.normalMin : 20;
+    const max = metricDef ? metricDef.normalMax : 50;
+    setSimulatedValues(
+      [1, 2, 3, 4, 5].map((id) => ({
+        id,
+        value: Math.round(min + Math.random() * (max - min))
+      }))
+    );
+  };
+
+  const handleSimulateSpike = () => {
+    const thresh = activeAlarmPreview.threshold;
+    setSimulatedValues([
+      { id: 1, value: Math.max(1, Math.round(thresh - 15)) },
+      { id: 2, value: Math.max(1, Math.round(thresh - 8)) },
+      { id: 3, value: Math.round(thresh + 4) },
+      { id: 4, value: Math.round(thresh + 9) },
+      { id: 5, value: Math.round(thresh + 14) }
+    ]);
+  };
+
+  const handleResetValues = () => {
+    setSimulatedValues(initialPeriods);
+  };
+
+  const handleUpdatePeriodValue = (id: number, val: number) => {
+    setSimulatedValues((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, value: val } : p))
+    );
+  };
+
+  // ================= SECTION 3 & 4: ALARM EVALUATION & EXPLANATION =================
+  const evaluationResult = useMemo(() => {
+    const { operator: op, threshold: t, evaluationPeriods: reqN, metricDisplay } = activeAlarmPreview;
+
+    const evaluatedPeriods = simulatedValues.map((p) => {
+      const isBreaching = isDatapointBreaching(p.value, t, op);
+      return {
+        ...p,
+        isBreaching
+      };
+    });
+
+    // Count maximum consecutive breaching periods ending at or within the sequence
+    let currentConsecutiveBreaches = 0;
+    let maxConsecutiveBreaches = 0;
+
+    for (const p of evaluatedPeriods) {
+      if (p.isBreaching) {
+        currentConsecutiveBreaches++;
+        if (currentConsecutiveBreaches > maxConsecutiveBreaches) {
+          maxConsecutiveBreaches = currentConsecutiveBreaches;
+        }
+      } else {
+        currentConsecutiveBreaches = 0;
+      }
+    }
+
+    const hasAnyBreach = evaluatedPeriods.some((p) => p.isBreaching);
+    let state: AlarmState = 'OK';
+    let explanation = '';
+
+    if (evaluatedPeriods.length < reqN) {
+      state = 'INSUFFICIENT_DATA';
+      explanation = `Fewer datapoints (${evaluatedPeriods.length}) than required evaluation periods (${reqN}) were simulated. The alarm evaluated to INSUFFICIENT_DATA.`;
+    } else if (maxConsecutiveBreaches >= reqN) {
+      state = 'ALARM';
+      explanation = `${metricDisplay} exceeded the threshold of ${t}${
+        activeAlarmPreview.unit === 'Percent' ? '%' : ''
+      } for ${maxConsecutiveBreaches} consecutive evaluation periods. The alarm changed from OK to ALARM.`;
+    } else if (hasAnyBreach) {
+      state = 'OK';
+      explanation = `The threshold was breached by individual periods, but the required number of consecutive evaluation periods (${reqN}) was not reached. The alarm remains OK.`;
+    } else {
+      state = 'OK';
+      explanation = `All evaluated metric values remained within safe limits. The alarm evaluated to OK.`;
+    }
+
+    return {
+      evaluatedPeriods,
+      maxConsecutiveBreaches,
+      state,
+      explanation
+    };
+  }, [simulatedValues, activeAlarmPreview]);
+
+  // ================= SECTION 5: EXPERIMENT (DYNAMIC THRESHOLD) =================
+  const handleExperimentThresholdChange = (newVal: number) => {
+    setThreshold(newVal);
+    setActiveAlarmPreview((prev) => ({
+      ...prev,
+      threshold: newVal
+    }));
+  };
+
+  // ================= SECTION 6: LEARNING CHALLENGES =================
+  const challenges: Challenge[] = [
+    {
+      id: 'ch-1',
+      title: 'Challenge 1: High CPU Outage Detection',
+      description: 'Create an alarm that triggers when CPU remains above 80% for 3 consecutive periods.',
+      testValues: [70, 75, 84, 86, 89],
+      hint: 'Set Resource = EC2-Web-01, Metric = CPUUtilization, Comparison = > or >=, Threshold = 80, Evaluation Periods = 3.',
+      validate: (cfg) =>
+        (cfg.metricName === 'CPUUtilization') &&
+        (cfg.operator === 'GreaterThanThreshold' || cfg.operator === 'GreaterThanOrEqualToThreshold') &&
+        cfg.threshold === 80 &&
+        cfg.evaluationPeriods === 3
+    },
+    {
+      id: 'ch-2',
+      title: 'Challenge 2: Low Available Capacity Detection',
+      description: 'Create an alarm that detects low disk capacity or connection drop below 20%.',
+      testValues: [35, 28, 18, 16, 14],
+      hint: 'Set Comparison = < or <=, Threshold = 20, with appropriate evaluation periods.',
+      validate: (cfg) =>
+        (cfg.operator === 'LessThanThreshold' || cfg.operator === 'LessThanOrEqualToThreshold') &&
+        cfg.threshold <= 20
+    },
+    {
+      id: 'ch-3',
+      title: 'Challenge 3: Filter Out Transient Spikes (Alarm Flapping)',
+      description: 'Create an alarm that does NOT trigger when CPU briefly reaches 85% for only 1 or 2 periods.',
+      testValues: [35, 85, 85, 40, 38],
+      hint: 'Require at least 3 or more consecutive evaluation periods (N >= 3) with threshold >= 80.',
+      validate: (cfg) =>
+        cfg.metricName === 'CPUUtilization' &&
+        cfg.evaluationPeriods >= 3 &&
+        cfg.threshold <= 85
+    },
+    {
+      id: 'ch-4',
+      title: 'Challenge 4: Database Connection Saturation Alert',
+      description: 'Create an alarm for Database-01 when active connections exceed 80.',
+      testValues: [25, 45, 82, 85, 89],
+      hint: 'Target Database-01, Metric = DatabaseConnections, Operator = >, Threshold = 80.',
+      validate: (cfg) =>
+        cfg.resourceId === 'Database-01' &&
+        cfg.metricName === 'DatabaseConnections' &&
+        (cfg.operator === 'GreaterThanThreshold' || cfg.operator === 'GreaterThanOrEqualToThreshold') &&
+        cfg.threshold === 80
+    }
+  ];
+
+  // Local storage persistence for completed challenges
+  const [completedChallenges, setCompletedChallenges] = useState<string[]>(() => {
+    const saved = localStorage.getItem('cw_learning_challenges');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cw_learning_challenges', JSON.stringify(completedChallenges));
+  }, [completedChallenges]);
+
+  const handleTestChallenge = (ch: Challenge) => {
+    const passed = ch.validate({
+      resourceId: activeAlarmPreview.resource,
+      metricName: activeAlarmPreview.metric,
+      operator: activeAlarmPreview.operator,
+      threshold: activeAlarmPreview.threshold,
+      evaluationPeriods: activeAlarmPreview.evaluationPeriods
+    });
+
+    if (passed) {
+      if (!completedChallenges.includes(ch.id)) {
+        setCompletedChallenges((prev) => [...prev, ch.id]);
+      }
+    }
+  };
+
+  const handleResetChallengeProgress = () => {
+    setCompletedChallenges([]);
+    localStorage.removeItem('cw_learning_challenges');
+  };
+
+  return (
+    <div className="space-y-8 max-w-6xl mx-auto pb-12">
+      {/* Title & Subtitle Banner */}
+      <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="flex items-center space-x-2">
+          <span className="bg-amber-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+            Educational Enhancement
+          </span>
+          <span className="text-amber-600 dark:text-amber-400 text-xs font-semibold">
+            Interactive AWS Observation Laboratory
+          </span>
         </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1.5 tracking-tight">
+          CloudWatch Learning Lab
+        </h1>
+        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+          Experiment with metrics, thresholds and alarm evaluation.
+        </p>
       </div>
 
-      {labMode === 'SANDBOX' ? (
-        /* ======================== MODE A: SANDBOX LAB ======================== */
-        <div className="space-y-6">
-          {/* Top Configuration Controls */}
-          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
-                <Sliders className="w-4 h-4 mr-2 text-amber-500" />
-                1. Configure Simulated CloudWatch Alarm Parameters
-              </h2>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                Adjust sliders to see live state changes
-              </span>
+      {/* ================= SECTION 1 — BUILD AN ALARM ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-5">
+        <div className="flex items-center space-x-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+            <Sliders className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              SECTION 1 — BUILD AN ALARM
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Configure resource, metric, threshold and evaluation parameters
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleCreateAlarm} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Resource */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Resource:
+              </label>
+              <select
+                value={selectedResourceId}
+                onChange={(e) => handleResourceChange(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
+              >
+                {resources.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({r.type})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              {/* Resource */}
-              <div>
-                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                  Resource
-                </label>
-                <select
-                  value={selectedResId}
-                  onChange={(e) => {
-                    setSelectedResId(e.target.value);
-                    const res = resources.find((r) => r.id === e.target.value);
-                    if (res) setSelectedMetric(res.supportedMetrics[0]);
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
-                >
-                  {resources.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      [{r.type}] {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Metric */}
-              <div>
-                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                  Metric
-                </label>
-                <select
-                  value={selectedMetric}
-                  onChange={(e) => setSelectedMetric(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
-                >
-                  {selectedResource.supportedMetrics.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Comparison Operator */}
-              <div>
-                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                  Comparison Operator
-                </label>
-                <select
-                  value={operator}
-                  onChange={(e) => setOperator(e.target.value as ComparisonOperator)}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
-                >
-                  <option value="GreaterThanOrEqualToThreshold">Greater Than or Equal (≥)</option>
-                  <option value="GreaterThanThreshold">Greater Than (&gt;)</option>
-                  <option value="LessThanOrEqualToThreshold">Less Than or Equal (≤)</option>
-                  <option value="LessThanThreshold">Less Than (&lt;)</option>
-                </select>
-              </div>
-
-              {/* Threshold */}
-              <div>
-                <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                  Threshold ({metricDef?.unit || 'Unit'}):{' '}
-                  <strong className="text-amber-600 dark:text-amber-400 font-mono">{threshold}</strong>
-                </label>
-                <input
-                  type="range"
-                  min={1}
-                  max={metricDef ? metricDef.defaultThreshold * 2 : 100}
-                  value={threshold}
-                  onChange={(e) => setThreshold(Number(e.target.value))}
-                  className="w-full accent-amber-500 mt-2"
-                />
-              </div>
+            {/* Metric */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Metric:
+              </label>
+              <select
+                value={selectedMetric}
+                onChange={(e) => handleMetricChange(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
+              >
+                {selectedResource.supportedMetrics.map((m) => (
+                  <option key={m} value={m}>
+                    {METRIC_DEFINITIONS[m]?.displayName || m} ({METRIC_DEFINITIONS[m]?.unit || ''})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* M of N Evaluation Periods Selector */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-50 dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    Evaluation Periods (N):
-                  </span>
-                  <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
-                    {evaluationPeriods} periods
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  value={evaluationPeriods}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    setEvaluationPeriods(n);
-                    if (datapointsToAlarm > n) setDatapointsToAlarm(n);
-                  }}
-                  className="w-full accent-sky-500"
-                />
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                  CloudWatch will observe the latest {evaluationPeriods} consecutive evaluation periods.
-                </span>
-              </div>
+            {/* Statistic */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Statistic:
+              </label>
+              <select
+                value={statistic}
+                onChange={(e) => setStatistic(e.target.value as MetricStatistic)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
+              >
+                <option value="Average">Average</option>
+                <option value="Maximum">Maximum</option>
+                <option value="Minimum">Minimum</option>
+              </select>
+            </div>
 
-              <div className="bg-slate-50 dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    Datapoints to Alarm (M):
-                  </span>
-                  <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
-                    {datapointsToAlarm} of {evaluationPeriods}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={evaluationPeriods}
-                  value={datapointsToAlarm}
-                  onChange={(e) => setDatapointsToAlarm(Number(e.target.value))}
-                  className="w-full accent-amber-500"
-                />
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                  Alarm fires if at least {datapointsToAlarm} of the last {evaluationPeriods} datapoints breach threshold.
-                </span>
-              </div>
+            {/* Comparison */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Comparison:
+              </label>
+              <select
+                value={operator}
+                onChange={(e) => setOperator(e.target.value as ComparisonOperator)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-mono font-bold"
+              >
+                <option value="GreaterThanThreshold">&gt; (Greater Than)</option>
+                <option value="GreaterThanOrEqualToThreshold">&gt;= (Greater Than or Equal)</option>
+                <option value="LessThanThreshold">&lt; (Less Than)</option>
+                <option value="LessThanOrEqualToThreshold">&lt;= (Less Than or Equal)</option>
+              </select>
+            </div>
+
+            {/* Threshold */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Threshold:
+              </label>
+              <input
+                type="number"
+                required
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value))}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-mono font-bold"
+              />
+            </div>
+
+            {/* Evaluation Periods */}
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Evaluation Periods:
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                required
+                value={evaluationPeriods}
+                onChange={(e) => setEvaluationPeriods(Number(e.target.value))}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-mono font-bold"
+              />
             </div>
           </div>
 
-          {/* Interactive State Machine Diagram & Live State */}
-          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
-                <RefreshCw className="w-4 h-4 mr-2 text-sky-500" />
-                2. Live CloudWatch State Machine & Sliding Window Buffer
-              </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Current Evaluated State:</span>
-                <span
-                  className={`px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider ${
-                    sandboxState === 'ALARM'
-                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
-                      : sandboxState === 'OK'
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-                  }`}
-                >
-                  {sandboxState}
-                </span>
-              </div>
+          {/* Alarm Name Input & Submit */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <div className="w-full sm:w-2/3">
+              <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                Alarm Name:
+              </label>
+              <input
+                type="text"
+                required
+                value={alarmName}
+                onChange={(e) => setAlarmName(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
+              />
             </div>
 
-            {/* CloudWatch State Machine Visual Flow */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              {/* Node 1: INSUFFICIENT_DATA */}
-              <div
-                className={`p-4 rounded-xl border text-center transition ${
-                  sandboxState === 'INSUFFICIENT_DATA'
-                    ? 'bg-amber-500/10 border-amber-500 shadow-xs scale-105 ring-1 ring-amber-500'
-                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
-                }`}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 mx-auto mb-2 animate-ping"></div>
-                <div className="font-bold text-xs text-amber-700 dark:text-amber-300 uppercase">
-                  INSUFFICIENT_DATA
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Datapoints &lt; {N} evaluation periods
-                </div>
-              </div>
-
-              {/* Node 2: OK */}
-              <div
-                className={`p-4 rounded-xl border text-center transition ${
-                  sandboxState === 'OK'
-                    ? 'bg-emerald-500/10 border-emerald-500 shadow-xs scale-105 ring-1 ring-emerald-500'
-                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
-                }`}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mx-auto mb-2"></div>
-                <div className="font-bold text-xs text-emerald-700 dark:text-emerald-300 uppercase">
-                  OK
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Breaching points &lt; {M} of {N}
-                </div>
-              </div>
-
-              {/* Node 3: ALARM */}
-              <div
-                className={`p-4 rounded-xl border text-center transition ${
-                  sandboxState === 'ALARM'
-                    ? 'bg-rose-500/10 border-rose-500 shadow-xs scale-105 ring-1 ring-rose-500'
-                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-60'
-                }`}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 mx-auto mb-2 animate-bounce"></div>
-                <div className="font-bold text-xs text-rose-700 dark:text-rose-400 uppercase">
-                  ALARM
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Breaching points ≥ {M} of {N}
-                </div>
-              </div>
-            </div>
-
-            {/* Sliding Evaluation Window Buffer Visualization */}
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  Active Sliding Evaluation Window (Last {N} Datapoints)
-                </span>
-                <span className="font-mono text-slate-500 dark:text-slate-400">
-                  Breaching:{' '}
-                  <strong className="text-amber-600 dark:text-amber-400">{breachingCount}</strong> /{' '}
-                  {M} required
-                </span>
-              </div>
-
-              {activeWindow.length === 0 ? (
-                <div className="py-6 text-center text-slate-400 text-xs italic">
-                  Evaluation buffer empty. Feed datapoints below to begin evaluation.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-2">
-                  {activeWindow.map((val, idx) => {
-                    const isBreach = isDatapointBreaching(val, threshold, operator);
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-2.5 rounded-lg border text-center font-mono transition ${
-                          isBreach
-                            ? 'bg-rose-500/15 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold'
-                            : 'bg-emerald-500/15 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                        }`}
-                      >
-                        <div className="text-[9px] text-slate-400">Point #{idx + 1}</div>
-                        <div className="text-sm">{val}</div>
-                        <div className="text-[9px] uppercase mt-0.5">
-                          {isBreach ? 'BREACH' : 'SAFE'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Explainability Engine */}
-            <div className="bg-amber-50/50 dark:bg-slate-900/60 p-4 rounded-xl border border-amber-500/30 space-y-2">
-              <div className="flex items-center space-x-2 text-amber-700 dark:text-amber-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Explainability Engine: "Why did the alarm enter this state?"</span>
-              </div>
-              <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-mono bg-white dark:bg-black/40 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
-                {explanationReason}
-              </p>
-            </div>
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs rounded-xl shadow-xs transition self-end flex items-center justify-center"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Create Alarm
+            </button>
           </div>
+        </form>
 
-          {/* Interactive Datapoint Feeder Section */}
-          <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
-                <Play className="w-4 h-4 mr-2 text-emerald-500" />
-                3. Interactive Datapoint Feeder (Experiment with Values)
-              </h2>
-              <button
-                onClick={handleResetBuffer}
-                className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center"
-              >
-                <RotateCcw className="w-3 h-3 mr-1" /> Clear Buffer
-              </button>
-            </div>
-
-            {/* Manual Single Value Injection */}
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <span className="text-xs text-slate-600 dark:text-slate-400">Value to feed:</span>
-                <input
-                  type="number"
-                  value={manualInputVal}
-                  onChange={(e) => setManualInputVal(Number(e.target.value))}
-                  className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2 w-full sm:w-auto">
-                <button
-                  onClick={() => handleFeedDatapoint(manualInputVal)}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg transition shadow-xs"
-                >
-                  Feed Datapoint
-                </button>
-                <button
-                  onClick={() => handleFeedDatapoint(threshold + 10)}
-                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-lg transition"
-                >
-                  + Feed Breaching ({threshold + 10})
-                </button>
-                <button
-                  onClick={() => handleFeedDatapoint(threshold - 15)}
-                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-lg transition"
-                >
-                  + Feed Safe ({threshold - 15})
-                </button>
-              </div>
-            </div>
-
-            {/* Preset Diagnostic Sequences */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-2">
-                Simulate Incident Sequences:
+        {/* Alarm Configuration Preview Panel */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+            Resulting Alarm Configuration Preview:
+          </h3>
+          <div className="bg-slate-50 dark:bg-slate-900/80 p-4 rounded-xl border border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+            <div>
+              <span className="text-[10px] text-slate-400 font-sans block">ALARM NAME</span>
+              <span className="font-bold text-slate-900 dark:text-white truncate block">
+                {activeAlarmPreview.name}
               </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                <button
-                  onClick={() => handleInjectSequence([35, 40, 89, 38, 42])}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
-                >
-                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-amber-500">
-                    1. Transient Spike (Cron Job)
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                    [35, 40, 89, 38, 42]
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleInjectSequence([45, 88, 92, 95, 99])}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
-                >
-                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-rose-500">
-                    2. Sustained Outage Breach
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                    [45, 88, 92, 95, 99]
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleInjectSequence([95, 90, 42, 38, 30])}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
-                >
-                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-emerald-500">
-                    3. Auto-Healing Recovery
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                    [95, 90, 42, 38, 30]
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleInjectSequence([30, 85, 32, 88, 31, 89])}
-                  className="p-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-left text-xs transition group"
-                >
-                  <div className="font-bold text-slate-900 dark:text-white group-hover:text-purple-500">
-                    4. Flapping Noise Wave
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                    [30, 85, 32, 88, 31, 89]
-                  </div>
-                </button>
-              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 font-sans block">RESOURCE & METRIC</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200 truncate block">
+                {activeAlarmPreview.resource} : {activeAlarmPreview.metricDisplay}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 font-sans block">CRITERIA</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400">
+                {activeAlarmPreview.statistic} {getOperatorSymbol(activeAlarmPreview.operator)}{' '}
+                {activeAlarmPreview.threshold}
+                {activeAlarmPreview.unit === 'Percent' ? '%' : ''}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 font-sans block">EVALUATION WINDOW</span>
+              <span className="font-bold text-sky-600 dark:text-sky-400">
+                {activeAlarmPreview.evaluationPeriods} consecutive periods
+              </span>
             </div>
           </div>
         </div>
-      ) : (
-        /* ======================== MODE B: GUIDED CHALLENGES ======================== */
-        <div className="space-y-6">
-          {/* Challenge Selector Tabs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {LEARNING_CHALLENGES.map((ch, idx) => (
-              <button
-                key={ch.id}
-                onClick={() => handleSelectChallenge(idx)}
-                className={`p-4 rounded-xl border text-left transition ${
-                  activeChallengeIdx === idx
-                    ? 'bg-amber-50 dark:bg-slate-800 border-amber-500 shadow-xs ring-1 ring-amber-500'
-                    : 'bg-white dark:bg-[#1e293b] border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      ch.difficulty === 'Beginner'
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                        : ch.difficulty === 'Intermediate'
-                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300'
-                        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300'
-                    }`}
-                  >
-                    {ch.difficulty}
-                  </span>
-                  <span className="text-xs text-slate-400">#{idx + 1}</span>
-                </div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white mt-2 truncate">
-                  {ch.title}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                  {ch.scenario}
-                </p>
-              </button>
-            ))}
-          </div>
+      </section>
 
-          {/* Active Challenge Card */}
-          <div className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-5">
+      {/* ================= SECTION 2 — SIMULATE METRIC VALUES ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-lg">
+              <TrendingUp className="w-4 h-4" />
+            </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <span className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                  <Award className="w-5 h-5" />
-                </span>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  {challenge.title}
-                </h2>
-              </div>
-              <p className="text-xs text-slate-700 dark:text-slate-300 mt-2 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
-                {challenge.scenario}
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                SECTION 2 — SIMULATE METRIC VALUES
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Current metric:{' '}
+                <strong className="text-slate-900 dark:text-white">
+                  {activeAlarmPreview.metricDisplay}
+                </strong>
               </p>
             </div>
+          </div>
 
-            {/* Architectural Context & Objective */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-50 dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                <span className="font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider block text-[10px]">
-                  AWS Architecture Context:
-                </span>
-                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {challenge.architectureContext}
-                </p>
-              </div>
+          {/* Generator Action Buttons */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleGenerateNormalTraffic}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition"
+            >
+              Generate Normal Traffic
+            </button>
+            <button
+              onClick={handleSimulateSpike}
+              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold text-xs transition"
+            >
+              Simulate Spike
+            </button>
+            <button
+              onClick={handleResetValues}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs transition flex items-center"
+              title="Reset to default sequence"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />
+              Reset Values
+            </button>
+          </div>
+        </div>
 
-              <div className="bg-slate-50 dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                <span className="font-bold text-sky-700 dark:text-sky-300 uppercase tracking-wider block text-[10px]">
-                  Challenge Objective:
-                </span>
-                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {challenge.objective}
-                </p>
-              </div>
-            </div>
-
-            {/* Test Sample Stream */}
-            <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Test Datapoint Stream that will be fed into your alarm:
-              </div>
-              <div className="flex items-center space-x-2 overflow-x-auto font-mono text-xs">
-                {challenge.sampleDatapoints.map((pt, i) => (
-                  <span
-                    key={i}
-                    className="px-2.5 py-1 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 rounded-md border border-slate-200 dark:border-slate-700 font-bold"
-                  >
-                    {pt}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Interactive Solution Form */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Your Proposed CloudWatch Alarm Configuration:
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                <div>
-                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                    Operator
-                  </label>
-                  <select
-                    value={challengeOperator}
-                    onChange={(e) => setChallengeOperator(e.target.value as ComparisonOperator)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-medium"
-                  >
-                    <option value="GreaterThanOrEqualToThreshold">Greater Than or Equal (≥)</option>
-                    <option value="GreaterThanThreshold">Greater Than (&gt;)</option>
-                    <option value="LessThanOrEqualToThreshold">Less Than or Equal (≤)</option>
-                    <option value="LessThanThreshold">Less Than (&lt;)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                    Threshold
-                  </label>
-                  <input
-                    type="number"
-                    value={challengeThreshold}
-                    onChange={(e) => setChallengeThreshold(Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                    Evaluation Periods (N)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={challengeN}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      setChallengeN(n);
-                      if (challengeM > n) setChallengeM(n);
-                    }}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-600 dark:text-slate-400 font-semibold mb-1">
-                    Datapoints to Alarm (M)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={challengeN}
-                    value={challengeM}
-                    onChange={(e) => setChallengeM(Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Ready to test your alarm against the incident workload?
-                </span>
-                <button
-                  onClick={handleRunChallengeEvaluation}
-                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-bold text-xs rounded-xl shadow-md transition flex items-center"
-                >
-                  <Play className="w-4 h-4 mr-1.5" />
-                  Evaluate Configuration
-                </button>
-              </div>
-            </div>
-
-            {/* Evaluation Result Feedback */}
-            {challengeResult && (
+        {/* Sequence of simulated values cards / inputs */}
+        <div>
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-2">
+            Sequence of simulated values across evaluation intervals (modify values inline):
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 font-mono">
+            {simulatedValues.map((p) => (
               <div
-                className={`p-4 rounded-xl border text-xs space-y-2 animate-fadeIn ${
-                  challengeResult.passed
-                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
-                    : 'bg-rose-500/10 border-rose-500/40 text-rose-800 dark:text-rose-200'
-                }`}
+                key={p.id}
+                className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1"
               >
-                <div className="flex items-center space-x-2 font-bold text-sm">
-                  {challengeResult.passed ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      <span>Challenge Solved!</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
-                      <span>Evaluation Criteria Not Satisfied</span>
-                    </>
-                  )}
+                <span className="text-[11px] font-sans font-bold text-slate-500 dark:text-slate-400 block">
+                  Period {p.id}:
+                </span>
+                <div className="flex items-center space-x-1">
+                  <input
+                    type="number"
+                    value={p.value}
+                    onChange={(e) => handleUpdatePeriodValue(p.id, Number(e.target.value))}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-slate-900 dark:text-white font-bold text-sm text-center"
+                  />
+                  <span className="text-xs text-slate-400 font-sans">
+                    {activeAlarmPreview.unit === 'Percent' ? '%' : ''}
+                  </span>
                 </div>
-                <p className="leading-relaxed">{challengeResult.message}</p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= SECTION 3 — ALARM EVALUATION ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                SECTION 3 — ALARM EVALUATION
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Evaluation against Threshold ={' '}
+                <strong className="text-slate-900 dark:text-white font-mono">
+                  {getOperatorSymbol(activeAlarmPreview.operator)} {activeAlarmPreview.threshold}
+                  {activeAlarmPreview.unit === 'Percent' ? '%' : ''}
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Alarm State Badge */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-slate-400 uppercase font-semibold">Alarm State:</span>
+            <span
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center ${
+                evaluationResult.state === 'ALARM'
+                  ? 'bg-rose-500 text-white shadow-xs animate-pulse'
+                  : evaluationResult.state === 'OK'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-amber-500 text-black shadow-xs'
+              }`}
+            >
+              <span className="mr-1.5">
+                {evaluationResult.state === 'ALARM'
+                  ? '🔴'
+                  : evaluationResult.state === 'OK'
+                  ? '🟢'
+                  : '🟡'}
+              </span>
+              {evaluationResult.state}
+            </span>
+          </div>
+        </div>
+
+        {/* Visual Evaluation Table: Period / Value / Status Checkmark */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                <th className="pb-2">Evaluation Period</th>
+                <th className="pb-2">Simulated Metric Value</th>
+                <th className="pb-2">Threshold Condition</th>
+                <th className="pb-2">Period Outcome</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {evaluationResult.evaluatedPeriods.map((p) => {
+                const opSym = getOperatorSymbol(activeAlarmPreview.operator);
+                return (
+                  <tr
+                    key={p.id}
+                    className={`transition ${
+                      p.isBreaching
+                        ? 'bg-rose-50/50 dark:bg-rose-950/20'
+                        : 'bg-emerald-50/30 dark:bg-emerald-950/10'
+                    }`}
+                  >
+                    <td className="py-2.5 font-bold text-slate-800 dark:text-slate-200">
+                      Period {p.id}
+                    </td>
+                    <td className="py-2.5 font-bold text-slate-900 dark:text-white">
+                      {p.value}
+                      {activeAlarmPreview.unit === 'Percent' ? '%' : ''}
+                    </td>
+                    <td className="py-2.5 text-slate-500 dark:text-slate-400">
+                      {opSym} {activeAlarmPreview.threshold}
+                    </td>
+                    <td className="py-2.5">
+                      {p.isBreaching ? (
+                        <span className="inline-flex items-center text-rose-600 dark:text-rose-400 font-bold font-sans">
+                          <XCircle className="w-4 h-4 mr-1 text-rose-500" />
+                          ✕ Breaching
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-bold font-sans">
+                          <CheckCircle2 className="w-4 h-4 mr-1 text-emerald-500" />
+                          ✓ Normal (OK)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Consecutive Periods Metrics Summary */}
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+          <div>
+            <span className="text-[10px] text-slate-400 font-sans block">
+              REQUIRED CONSECUTIVE PERIODS
+            </span>
+            <span className="text-base font-bold text-slate-900 dark:text-white">
+              {activeAlarmPreview.evaluationPeriods} consecutive periods
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 font-sans block">
+              CURRENT CONSECUTIVE BREACHING PERIODS
+            </span>
+            <span
+              className={`text-base font-bold ${
+                evaluationResult.maxConsecutiveBreaches >= activeAlarmPreview.evaluationPeriods
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              {evaluationResult.maxConsecutiveBreaches} consecutive periods
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= SECTION 4 — EXPLANATION ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-3">
+        <div className="flex items-center space-x-2">
+          <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              SECTION 4 — EXPLANATION
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Plain-English pedagogical breakdown of why the alarm evaluated to {evaluationResult.state}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-slate-900 border border-amber-300 dark:border-amber-900/60">
+          <p className="text-sm text-slate-900 dark:text-slate-100 font-medium leading-relaxed">
+            "{evaluationResult.explanation}"
+          </p>
+          <div className="mt-3 text-[11px] text-amber-700 dark:text-amber-400/90 font-sans flex items-center">
+            <Info className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+            This explanation is generated dynamically as part of our interactive CloudWatch learning interface.
+          </div>
+        </div>
+      </section>
+
+      {/* ================= SECTION 5 — EXPERIMENT ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+        <div className="flex items-center space-x-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg">
+            <Zap className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              SECTION 5 — EXPERIMENT
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Change the threshold and see what happens immediately.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                Current Threshold:
+              </span>
+              <span className="text-2xl font-black text-amber-600 dark:text-amber-400 font-mono">
+                {activeAlarmPreview.threshold}
+                {activeAlarmPreview.unit === 'Percent' ? '%' : ''}
+              </span>
+            </div>
+
+            {/* Quick Experiment Chips */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-sans">Change to:</span>
+              {[70, 75, 80, 85, 90, 95].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => handleExperimentThresholdChange(val)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition border ${
+                    activeAlarmPreview.threshold === val
+                      ? 'bg-amber-500 text-black border-transparent shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-500'
+                  }`}
+                >
+                  {val}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            💡 <strong>Observation:</strong> Notice how raising the threshold to <strong>90%</strong> immediately
+            clears periods that breached at 80%, reverting the alarm state back from <strong>ALARM</strong> to <strong>OK</strong> without needing any server restart!
+          </div>
+        </div>
+      </section>
+
+      {/* ================= SECTION 6 — LEARNING CHALLENGES ================= */}
+      <section className="bg-white dark:bg-[#1e293b] p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+              <Award className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                SECTION 6 — LEARNING CHALLENGES
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Complete interactive exercises to validate CloudWatch monitoring concepts
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-slate-900 px-3 py-1 rounded-lg border border-amber-200 dark:border-slate-800">
+              Progress: {completedChallenges.length} / {challenges.length} Solved
+            </span>
+            {completedChallenges.length > 0 && (
+              <button
+                onClick={handleResetChallengeProgress}
+                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white flex items-center"
+                title="Reset challenge progress"
+              >
+                <RotateCcw className="w-3 h-3 mr-1" /> Reset
+              </button>
             )}
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {challenges.map((ch) => {
+            const isCompleted = completedChallenges.includes(ch.id);
+
+            return (
+              <div
+                key={ch.id}
+                className={`p-4 rounded-xl border transition flex flex-col justify-between ${
+                  isCompleted
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-400 dark:border-emerald-800'
+                    : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-xs text-slate-900 dark:text-white">
+                      {ch.title}
+                    </h3>
+                    {isCompleted && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-white uppercase flex items-center">
+                        <Check className="w-3 h-3 mr-1" /> Completed!
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    {ch.description}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-2 font-mono bg-white dark:bg-slate-800/80 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                    💡 Hint: {ch.hint}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Uses current Section 1 alarm config
+                  </span>
+                  <button
+                    onClick={() => handleTestChallenge(ch)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 text-white dark:bg-amber-500 dark:text-black font-bold text-xs transition shadow-xs hover:opacity-90 flex items-center"
+                  >
+                    Verify Alarm Configuration
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 };
