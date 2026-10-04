@@ -9,18 +9,25 @@ import {
   Zap,
   Globe,
   CheckCircle,
-  AlertCircle,
   ShieldAlert,
-  Flame,
+  Info,
+  Menu,
   X
 } from 'lucide-react';
 
 interface HeaderProps {
   onNavigateTab: (tab: string) => void;
   openChaosDrawer?: () => void;
+  onOpenMobile?: () => void;
+  onOpenAbout?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onNavigateTab,
+  openChaosDrawer,
+  onOpenMobile,
+  onOpenAbout
+}) => {
   const {
     theme,
     toggleTheme,
@@ -30,8 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }
     isSimulating,
     toggleSimulation,
     simSpeed,
-    setSimSpeed,
-    activeChaos
+    setSimSpeed
   } = useCloudWatch();
 
   const [isAlertPopoverOpen, setIsAlertPopoverOpen] = useState(false);
@@ -42,34 +48,47 @@ export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="px-4 lg:px-6 h-14 flex items-center justify-between gap-4">
-        {/* Left: App Logo & Brand */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-sm shadow-amber-500/30">
+      <div className="px-3 sm:px-6 h-14 flex items-center justify-between gap-3">
+        {/* Left: Mobile Menu Toggle & App Logo & Brand */}
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+          {onOpenMobile && (
+            <button
+              onClick={onOpenMobile}
+              className="p-1.5 -ml-1 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-lg md:hidden"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          <div
+            onClick={() => onNavigateTab('dashboard')}
+            className="flex items-center space-x-2.5 cursor-pointer group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center shadow-sm shadow-amber-500/30 group-hover:scale-105 transition">
               <span className="text-black font-black text-xs tracking-tighter">CW</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-1.5 leading-none">
-                <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white">
+                <span className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
                   CloudWatch
                 </span>
-                <span className="text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider">
-                  Platform
+                <span className="text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider hidden xs:inline">
+                  Simulator
                 </span>
               </div>
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium hidden sm:inline">
-                Interactive AWS Monitoring Simulator
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium hidden lg:inline">
+                Interactive AWS Monitoring Platform
               </span>
             </div>
           </div>
         </div>
 
         {/* Center: Environment & Region */}
-        <div className="hidden md:flex items-center space-x-2">
+        <div className="hidden lg:flex items-center space-x-2">
           <div className="flex items-center text-xs bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-300">
             <Globe className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
-            <span className="text-slate-400 dark:text-slate-500 mr-1 text-[11px]">Env:</span>
+            <span className="text-slate-400 dark:text-slate-500 mr-1 text-[11px]">Region:</span>
             <select
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
@@ -85,8 +104,20 @@ export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }
           </div>
         </div>
 
-        {/* Right: Simulation Controls, Alarm Indicator, Theme Toggle */}
-        <div className="flex items-center space-x-2.5">
+        {/* Right: Simulation Controls, Incident Injector, Alarm Indicator, Theme Toggle, About */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* Quick Incident Simulation Button */}
+          {openChaosDrawer && (
+            <button
+              onClick={openChaosDrawer}
+              className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              title="Open Incident & Chaos Injection Drawer"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Chaos Injector</span>
+            </button>
+          )}
+
           {/* Simulation Engine Widget */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
             <button
@@ -102,17 +133,17 @@ export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 mr-1.5 animate-pulse"></span>
                   <Pause className="w-3 h-3 mr-1" />
-                  Live
+                  <span className="hidden sm:inline">Live</span>
                 </>
               ) : (
                 <>
                   <Play className="w-3 h-3 mr-1" />
-                  Paused
+                  <span className="hidden sm:inline">Paused</span>
                 </>
               )}
             </button>
 
-            <div className="flex items-center ml-1 space-x-0.5">
+            <div className="hidden xs:flex items-center ml-1 space-x-0.5">
               {[1, 2, 5].map((speed) => (
                 <button
                   key={speed}
@@ -224,6 +255,17 @@ export const Header: React.FC<HeaderProps> = ({ onNavigateTab, openChaosDrawer }
               <Moon className="w-4 h-4 text-slate-700" />
             )}
           </button>
+
+          {/* About this Simulator Button */}
+          {onOpenAbout && (
+            <button
+              onClick={onOpenAbout}
+              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-amber-500 hover:border-amber-500/50 transition cursor-pointer"
+              title="About this Simulator"
+            >
+              <Info className="w-4 h-4 text-amber-500" />
+            </button>
+          )}
         </div>
       </div>
     </header>

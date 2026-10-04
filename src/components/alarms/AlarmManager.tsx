@@ -45,10 +45,6 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({
   } = useCloudWatch();
 
   const isDark = theme === 'dark';
-  const gridStroke = isDark ? '#334155' : '#e2e8f0';
-  const textFill = isDark ? '#94a3b8' : '#64748b';
-  const tooltipBg = isDark ? '#0f172a' : '#ffffff';
-  const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
   // Navigation tab within Alarms section: 'ALARMS' vs 'HISTORY'
   const [activeView, setActiveView] = useState<'ALARMS' | 'HISTORY'>(initialView);

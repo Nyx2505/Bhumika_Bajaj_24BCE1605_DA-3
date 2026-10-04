@@ -16,7 +16,8 @@ import {
   CheckCircle,
   Database,
   Sliders,
-  Flame
+  Flame,
+  Info
 } from 'lucide-react';
 import { MetricChart } from '../charts/MetricChart';
 import { AlarmStatusBadge } from '../alarms/AlarmStatusBadge';
@@ -24,11 +25,13 @@ import { AlarmStatusBadge } from '../alarms/AlarmStatusBadge';
 interface OperationalDashboardProps {
   onNavigateTab: (tab: string) => void;
   onSelectResourceForMetrics: (resourceId: string) => void;
+  onOpenAbout?: () => void;
 }
 
 export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
   onNavigateTab,
-  onSelectResourceForMetrics
+  onSelectResourceForMetrics,
+  onOpenAbout
 }) => {
   const {
     resources,
@@ -186,8 +189,18 @@ export const OperationalDashboard: React.FC<OperationalDashboardProps> = ({
             </p>
           </div>
 
-          {/* Reset Simulation Button */}
+          {/* Header Action Buttons */}
           <div className="flex items-center space-x-2">
+            {onOpenAbout && (
+              <button
+                onClick={onOpenAbout}
+                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-lg border border-amber-500/30 transition flex items-center shadow-2xs cursor-pointer"
+                title="About this Educational Simulator"
+              >
+                <Info className="w-3.5 h-3.5 mr-1 text-amber-500" />
+                About Simulator
+              </button>
+            )}
             <button
               onClick={() => setIsResetConfirmOpen(true)}
               className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg border border-slate-300 dark:border-slate-700 transition flex items-center shadow-2xs hover:border-amber-500"
