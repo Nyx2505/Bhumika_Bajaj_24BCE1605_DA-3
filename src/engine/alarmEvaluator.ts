@@ -19,14 +19,27 @@ export function isDatapointBreaching(
   }
 }
 
+export function getOperatorSymbol(operator: ComparisonOperator): string {
+  switch (operator) {
+    case 'GreaterThanOrEqualToThreshold':
+      return '>=';
+    case 'GreaterThanThreshold':
+      return '>';
+    case 'LessThanOrEqualToThreshold':
+      return '<=';
+    case 'LessThanThreshold':
+      return '<';
+  }
+}
+
 export function formatOperator(operator: ComparisonOperator): string {
   switch (operator) {
     case 'GreaterThanOrEqualToThreshold':
-      return 'greater than or equal to (≥)';
+      return 'greater than or equal to (>=)';
     case 'GreaterThanThreshold':
       return 'greater than (>)';
     case 'LessThanOrEqualToThreshold':
-      return 'less than or equal to (≤)';
+      return 'less than or equal to (<=)';
     case 'LessThanThreshold':
       return 'less than (<)';
   }
@@ -46,7 +59,7 @@ export function evaluateAlarm(
 ): EvaluationResult {
   // Update sliding buffer (maintain last N evaluation periods)
   const N = alarm.evaluationPeriods;
-  const M = alarm.datapointsToAlarm;
+  const M = alarm.datapointsToAlarm || N;
   const newBuffer = [...alarm.evaluationBuffer, Number(newDatapoint.toFixed(1))].slice(-N);
 
   let nextState: AlarmState = alarm.state;
@@ -55,21 +68,21 @@ export function evaluateAlarm(
 
   if (newBuffer.length < N) {
     nextState = 'INSUFFICIENT_DATA';
-    explanation = `Insufficient Datapoints: CloudWatch requires ${N} evaluation periods to reliably determine state, but currently only has ${newBuffer.length} datapoint(s) [${newBuffer.join(', ')}].`;
+    explanation = `Insufficient Datapoints: CloudWatch requires ${N} consecutive evaluation periods to reliably determine state, but currently only has ${newBuffer.length} datapoint(s) [${newBuffer.join(', ')}].`;
   } else {
-    // Count breaching points
+    // Count breaching points in the sliding window
     breachingCount = newBuffer.filter((val) =>
       isDatapointBreaching(val, alarm.threshold, alarm.comparisonOperator)
     ).length;
 
-    const opDesc = formatOperator(alarm.comparisonOperator);
+    const opSymbol = getOperatorSymbol(alarm.comparisonOperator);
 
     if (breachingCount >= M) {
       nextState = 'ALARM';
-      explanation = `Threshold Crossed: ${breachingCount} out of the last ${N} datapoints [${newBuffer.join(', ')}] were ${opDesc} the threshold (${alarm.threshold}). Condition (${M} of ${N}) met.`;
+      explanation = `Threshold Crossed: ${breachingCount} of the last ${N} consecutive datapoints [${newBuffer.join(', ')}] were ${opSymbol} threshold (${alarm.threshold}). Alarm condition met.`;
     } else {
       nextState = 'OK';
-      explanation = `Threshold Not Crossed: ${breachingCount} out of the last ${N} datapoints [${newBuffer.join(', ')}] met the alarm condition, which is less than the required ${M} datapoints. State is OK.`;
+      explanation = `Threshold Not Crossed: ${breachingCount} of the last ${N} consecutive datapoints [${newBuffer.join(', ')}] breached threshold. Condition not met (requires ${M} of ${N}). State is OK.`;
     }
   }
 
@@ -82,7 +95,7 @@ export function evaluateAlarm(
           toState: nextState,
           reason: explanation
         },
-        ...alarm.history.slice(0, 19)
+        ...alarm.history.slice(0, 49) // Keep last 50 transitions for rich history
       ]
     : alarm.history;
 

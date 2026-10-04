@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCloudWatch } from '../../context/CloudWatchContext';
 import { METRIC_DEFINITIONS } from '../../data/initialResources';
 import { Alarm, AlarmState, ComparisonOperator, MetricStatistic } from '../../types/cloudwatch';
+import { getOperatorSymbol } from '../../engine/alarmEvaluator';
 import {
   Bell,
+  CheckCircle,
+  AlertTriangle,
   Plus,
   Trash2,
   Clock,
   ChevronRight,
   X,
   Sliders,
+  Send,
+  ArrowRight,
+  ShieldAlert,
+  Play,
+  History,
+  RotateCcw,
   Info
 } from 'lucide-react';
 import {
@@ -24,8 +33,15 @@ import {
 } from 'recharts';
 
 export const AlarmManager: React.FC = () => {
-  const { alarms, resources, metricHistory, createAlarm, deleteAlarm, theme } =
-    useCloudWatch();
+  const {
+    alarms,
+    resources,
+    metricHistory,
+    createAlarm,
+    deleteAlarm,
+    injectDatapoint,
+    theme
+  } = useCloudWatch();
 
   const isDark = theme === 'dark';
   const gridStroke = isDark ? '#334155' : '#e2e8f0';
@@ -33,27 +49,70 @@ export const AlarmManager: React.FC = () => {
   const tooltipBg = isDark ? '#0f172a' : '#ffffff';
   const tooltipBorder = isDark ? '#475569' : '#cbd5e1';
 
+  // Navigation tab within Alarms section: 'ALARMS' vs 'HISTORY'
+  const [activeView, setActiveView] = useState<'ALARMS' | 'HISTORY'>('ALARMS');
+
+  // Filter state
   const [activeFilter, setActiveFilter] = useState<'ALL' | AlarmState>('ALL');
   const [selectedAlarm, setSelectedAlarm] = useState<Alarm | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
 
   // Form state for creating a new alarm
-  const [formResourceId, setFormResourceId] = useState<string>(resources[0]?.id || '');
+  const [formResourceId, setFormResourceId] = useState<string>(resources[0]?.id || 'EC2-Web-01');
   const [formMetricName, setFormMetricName] = useState<string>('CPUUtilization');
-  const [formName, setFormName] = useState<string>('Custom-Alarm-WebTier');
-  const [formDescription, setFormDescription] = useState<string>('Triggers on sustained metric breach');
+  const [formName, setFormName] = useState<string>('EC2-Web-01-High-CPU');
+  const [formDescription, setFormDescription] = useState<string>(
+    'Triggers when CPU exceeds threshold for consecutive periods'
+  );
   const [formStatistic, setFormStatistic] = useState<MetricStatistic>('Average');
   const [formPeriod, setFormPeriod] = useState<number>(60);
   const [formEvaluationPeriods, setFormEvaluationPeriods] = useState<number>(3);
-  const [formDatapointsToAlarm, setFormDatapointsToAlarm] = useState<number>(3);
-  const [formOperator, setFormOperator] = useState<ComparisonOperator>('GreaterThanOrEqualToThreshold');
-  const [formThreshold, setFormThreshold] = useState<number>(75);
-  const [formSnsTopic, setFormSnsTopic] = useState<string>('arn:aws:sns:us-east-1:123456789012:cloudwatch-alerts');
+  const [formOperator, setFormOperator] = useState<ComparisonOperator>('GreaterThanThreshold');
+  const [formThreshold, setFormThreshold] = useState<number>(80);
+  const [formSnsTopic, setFormSnsTopic] = useState<string>(
+    'arn:aws:sns:us-east-1:123456789012:ops-critical-alerts'
+  );
+
+  // In-modal manual test injection value
+  const [testFeedValue, setTestFeedValue] = useState<number>(85);
 
   const filteredAlarms = alarms.filter((a) => {
     if (activeFilter === 'ALL') return true;
     return a.state === activeFilter;
   });
+
+  // Collect all history items across all alarms for global history feed
+  const allHistoryItems = useMemo(() => {
+    const list: {
+      alarmId: string;
+      alarmName: string;
+      resourceId: string;
+      metricName: string;
+      timestamp: string;
+      fromState: AlarmState;
+      toState: AlarmState;
+      reason: string;
+    }[] = [];
+
+    alarms.forEach((alarm) => {
+      alarm.history.forEach((h) => {
+        list.push({
+          alarmId: alarm.id,
+          alarmName: alarm.name,
+          resourceId: alarm.resourceId,
+          metricName: alarm.metricName,
+          timestamp: h.timestamp,
+          fromState: h.fromState,
+          toState: h.toState,
+          reason: h.reason
+        });
+      });
+    });
+
+    return list.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [alarms]);
 
   const handleOpenCreateModal = () => {
     const res = resources[0];
@@ -82,7 +141,7 @@ export const AlarmManager: React.FC = () => {
       statistic: formStatistic,
       period: formPeriod,
       evaluationPeriods: formEvaluationPeriods,
-      datapointsToAlarm: formDatapointsToAlarm,
+      datapointsToAlarm: formEvaluationPeriods, // Consecutive periods
       comparisonOperator: formOperator,
       threshold: formThreshold,
       actions: {
@@ -92,10 +151,12 @@ export const AlarmManager: React.FC = () => {
     setIsCreateModalOpen(false);
   };
 
+  // Sync selected alarm with latest live data from context
   const currentSelectedAlarm = selectedAlarm
     ? alarms.find((a) => a.id === selectedAlarm.id) || selectedAlarm
     : null;
 
+  // Chart data for selected alarm
   const selectedAlarmHistory = currentSelectedAlarm
     ? (metricHistory[`${currentSelectedAlarm.resourceId}:${currentSelectedAlarm.metricName}`] || []).map(
         (pt) => ({
@@ -109,6 +170,15 @@ export const AlarmManager: React.FC = () => {
       )
     : [];
 
+  // Helper to fetch latest metric value for an alarm
+  const getCurrentMetricValue = (alarm: Alarm) => {
+    const pts = metricHistory[`${alarm.resourceId}:${alarm.metricName}`] || [];
+    if (pts.length === 0) return '--';
+    const lastVal = pts[pts.length - 1].value;
+    const def = METRIC_DEFINITIONS[alarm.metricName];
+    return `${lastVal}${def?.unit === 'Percent' ? '%' : ' ' + (def?.unit || '')}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -119,135 +189,341 @@ export const AlarmManager: React.FC = () => {
             CloudWatch Alarms & Multi-Period State Machine
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Evaluate time-series metrics against statistical thresholds using sliding evaluation windows (M of N)
+            Simulate threshold evaluations, consecutive evaluation period logic, and real-time state transitions
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg shadow-xs transition flex items-center self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4 mr-1.5" />
-          Create CloudWatch Alarm
-        </button>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-        <button
-          onClick={() => setActiveFilter('ALL')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-            activeFilter === 'ALL'
-              ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-black shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          All Alarms ({alarms.length})
-        </button>
-        <button
-          onClick={() => setActiveFilter('ALARM')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
-            activeFilter === 'ALARM'
-              ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
-              : 'text-slate-600 dark:text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
-          In Alarm ({alarms.filter((a) => a.state === 'ALARM').length})
-        </button>
-        <button
-          onClick={() => setActiveFilter('OK')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
-            activeFilter === 'OK'
-              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-              : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
-          OK ({alarms.filter((a) => a.state === 'OK').length})
-        </button>
-        <button
-          onClick={() => setActiveFilter('INSUFFICIENT_DATA')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
-            activeFilter === 'INSUFFICIENT_DATA'
-              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-              : 'text-slate-600 dark:text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
-          Insufficient Data ({alarms.filter((a) => a.state === 'INSUFFICIENT_DATA').length})
-        </button>
-      </div>
-
-      {/* Alarms List */}
-      <div className="grid grid-cols-1 gap-3">
-        {filteredAlarms.map((alarm) => {
-          let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-          let borderHighlight = 'border-slate-200 dark:border-slate-700';
-
-          if (alarm.state === 'ALARM') {
-            badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30';
-            borderHighlight = 'border-rose-300 dark:border-rose-900/60 hover:border-rose-500';
-          } else if (alarm.state === 'OK') {
-            badgeColor = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30';
-            borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-emerald-500/50';
-          } else if (alarm.state === 'INSUFFICIENT_DATA') {
-            badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30';
-            borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-amber-500/50';
-          }
-
-          return (
-            <div
-              key={alarm.id}
-              onClick={() => setSelectedAlarm(alarm)}
-              className={`cursor-pointer bg-white dark:bg-[#1e293b] p-4 rounded-xl border ${borderHighlight} transition shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800/80 group`}
+        <div className="flex items-center space-x-2">
+          {/* View Toggle: Alarms vs History */}
+          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center">
+            <button
+              onClick={() => setActiveView('ALARMS')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                activeView === 'ALARMS'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-start space-x-3">
-                  <span
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${badgeColor} mt-0.5`}
-                  >
-                    {alarm.state}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition">
-                      {alarm.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{alarm.description}</p>
+              Alarms ({alarms.length})
+            </button>
+            <button
+              onClick={() => setActiveView('HISTORY')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center ${
+                activeView === 'HISTORY'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <History className="w-3.5 h-3.5 mr-1" />
+              History Feed ({allHistoryItems.length})
+            </button>
+          </div>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg shadow-xs transition flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Create Alarm
+          </button>
+        </div>
+      </div>
+
+      {activeView === 'ALARMS' ? (
+        /* ======================== ALARMS VIEW ======================== */
+        <div className="space-y-4">
+          {/* Filter Tabs */}
+          <div className="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <button
+              onClick={() => setActiveFilter('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeFilter === 'ALL'
+                  ? 'bg-slate-900 text-white dark:bg-amber-500 dark:text-black shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              All Alarms ({alarms.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('ALARM')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
+                activeFilter === 'ALARM'
+                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
+              In Alarm ({alarms.filter((a) => a.state === 'ALARM').length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('OK')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
+                activeFilter === 'OK'
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+              OK ({alarms.filter((a) => a.state === 'OK').length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('INSUFFICIENT_DATA')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center ${
+                activeFilter === 'INSUFFICIENT_DATA'
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+              Insufficient Data ({alarms.filter((a) => a.state === 'INSUFFICIENT_DATA').length})
+            </button>
+          </div>
+
+          {/* Alarm Cards List */}
+          <div className="grid grid-cols-1 gap-3">
+            {filteredAlarms.map((alarm) => {
+              const opSymbol = getOperatorSymbol(alarm.comparisonOperator);
+              const currentVal = getCurrentMetricValue(alarm);
+
+              let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+              let borderHighlight = 'border-slate-200 dark:border-slate-700';
+
+              if (alarm.state === 'ALARM') {
+                badgeColor = 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30';
+                borderHighlight = 'border-rose-300 dark:border-rose-900/60 hover:border-rose-500';
+              } else if (alarm.state === 'OK') {
+                badgeColor = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30';
+                borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-emerald-500/50';
+              } else if (alarm.state === 'INSUFFICIENT_DATA') {
+                badgeColor = 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30';
+                borderHighlight = 'border-slate-200 dark:border-slate-700 hover:border-amber-500/50';
+              }
+
+              return (
+                <div
+                  key={alarm.id}
+                  onClick={() => setSelectedAlarm(alarm)}
+                  className={`cursor-pointer bg-white dark:bg-[#1e293b] p-4 rounded-xl border ${borderHighlight} transition shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800/80 group`}
+                >
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    {/* Left: State Badge, Title, Description */}
+                    <div className="flex items-start space-x-3">
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${badgeColor} mt-0.5`}
+                      >
+                        {alarm.state}
+                      </span>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-amber-500 transition">
+                            {alarm.name}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          {alarm.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right: Key Alarm Parameters */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-sans block">RESOURCE</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {alarm.resourceId}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-sans block">CONDITION</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {opSymbol} {alarm.threshold} ({alarm.evaluationPeriods} periods)
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-sans block">CURRENT VALUE</span>
+                        <span className="font-bold text-amber-600 dark:text-amber-400">
+                          {currentVal}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-end space-x-2">
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 font-sans block">STATE CHANGE</span>
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">
+                            {new Date(alarm.stateUpdatedTimestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom: Consecutive Datapoints Evaluation Buffer & Status Reason */}
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center space-x-2 text-[11px] truncate">
+                      <span className="text-slate-400 font-semibold">Evaluation Reason:</span>
+                      <span className="font-mono text-slate-700 dark:text-slate-300 truncate">
+                        {alarm.stateReason}
+                      </span>
+                    </div>
+
+                    {/* Mini Sliding Buffer Pills */}
+                    <div className="flex items-center space-x-1.5 flex-shrink-0">
+                      <span className="text-[10px] text-slate-400 uppercase font-sans">
+                        Buffer ({alarm.evaluationBuffer.length}/{alarm.evaluationPeriods}):
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        {alarm.evaluationBuffer.map((val, idx) => {
+                          const isBreaching =
+                            alarm.comparisonOperator === 'GreaterThanThreshold'
+                              ? val > alarm.threshold
+                              : alarm.comparisonOperator === 'GreaterThanOrEqualToThreshold'
+                              ? val >= alarm.threshold
+                              : alarm.comparisonOperator === 'LessThanThreshold'
+                              ? val < alarm.threshold
+                              : val <= alarm.threshold;
+
+                          return (
+                            <span
+                              key={idx}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                isBreaching
+                                  ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                              }`}
+                            >
+                              {val}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex items-center space-x-3 self-end sm:self-center">
-                  <div className="text-right text-xs">
-                    <span className="text-slate-400 block text-[10px]">EVALUATION BUFFER</span>
-                    <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">
-                      {alarm.datapointsToAlarm} of {alarm.evaluationPeriods} datapoints
-                    </span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition" />
-                </div>
-              </div>
-
-              {/* Status Reason Bar */}
-              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
-                <div className="text-slate-600 dark:text-slate-300 text-[11px] truncate flex items-center">
-                  <span className="text-slate-400 mr-1.5 font-semibold">Evaluation Reason:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-200">{alarm.stateReason}</span>
-                </div>
-                <div className="text-slate-400 text-[10px] font-mono whitespace-nowrap">
-                  Updated: {new Date(alarm.stateUpdatedTimestamp).toLocaleTimeString()}
-                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* ======================== ALARM HISTORY SECTION ======================== */
+        <div className="bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center space-x-2">
+              <History className="w-5 h-5 text-amber-500" />
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  CloudWatch Alarm State Transition History
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Chronological audit of state changes (e.g. OK → ALARM, ALARM → OK)
+                </p>
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Selected Alarm Detail Modal / Drawer */}
+            <span className="text-xs font-mono text-slate-400 bg-slate-50 dark:bg-slate-900 px-3 py-1 rounded-md border border-slate-200 dark:border-slate-800">
+              {allHistoryItems.length} Total Transitions
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {allHistoryItems.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs italic">
+                No alarm state transitions recorded yet. Adjust thresholds or feed datapoints to observe transitions.
+              </div>
+            ) : (
+              allHistoryItems.map((hist, idx) => {
+                const isToAlarm = hist.toState === 'ALARM';
+                const isToOk = hist.toState === 'OK';
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-xl border transition flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                      isToAlarm
+                        ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60'
+                        : isToOk
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60'
+                        : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="text-center font-mono pt-0.5">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                          {new Date(hist.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(hist.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="h-9 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-1" />
+
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                            {hist.alarmName}
+                          </h4>
+                          <span className="text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            {hist.resourceId} : {hist.metricName}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed font-mono">
+                          {hist.reason}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Transition Badge: OK → ALARM or ALARM → OK */}
+                    <div className="flex items-center space-x-2 self-end md:self-center flex-shrink-0">
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider flex items-center ${
+                          hist.fromState === 'ALARM'
+                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                            : hist.fromState === 'OK'
+                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                        }`}
+                      >
+                        {hist.fromState}
+                      </span>
+
+                      <ArrowRight className="w-4 h-4 text-slate-400" />
+
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider flex items-center ${
+                          isToAlarm
+                            ? 'bg-rose-600 text-white font-black shadow-xs animate-pulse'
+                            : isToOk
+                            ? 'bg-emerald-600 text-white font-black shadow-xs'
+                            : 'bg-amber-500 text-black font-black shadow-xs'
+                        }`}
+                      >
+                        {hist.toState}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= ALARM DETAIL & TEST DRAWER ================= */}
       {currentSelectedAlarm && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex justify-end animate-fadeIn">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-fadeIn">
           <div className="w-full max-w-2xl bg-white dark:bg-[#0f172a] border-l border-slate-200 dark:border-slate-800 h-full p-6 flex flex-col shadow-2xl overflow-y-auto">
-            {/* Modal Header */}
+            {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center space-x-2">
                 <Bell className="w-5 h-5 text-amber-500" />
@@ -280,48 +556,93 @@ export const AlarmManager: React.FC = () => {
               </div>
             </div>
 
-            {/* Current State Indicator */}
+            {/* Current State & Parameters Banner */}
             <div className="my-4 p-4 rounded-xl border bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider">
-                  Current Evaluated State
-                </span>
+                <div>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block">
+                    CURRENT STATE
+                  </span>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                    Updated:{' '}
+                    {new Date(currentSelectedAlarm.stateUpdatedTimestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true
+                    })}
+                  </div>
+                </div>
+
                 <span
-                  className={`px-3 py-1 rounded-md text-xs font-black uppercase tracking-wider ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider ${
                     currentSelectedAlarm.state === 'ALARM'
-                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                      ? 'bg-rose-500 text-white shadow-xs animate-pulse'
                       : currentSelectedAlarm.state === 'OK'
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-amber-500 text-black shadow-xs'
                   }`}
                 >
                   {currentSelectedAlarm.state}
                 </span>
               </div>
+
+              {/* Grid of parameters */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-xs font-mono">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-sans block">STATISTIC</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {currentSelectedAlarm.statistic}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-sans block">OPERATOR</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {getOperatorSymbol(currentSelectedAlarm.comparisonOperator)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-sans block">THRESHOLD</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {currentSelectedAlarm.threshold}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-sans block">EVALUATION</span>
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">
+                    {currentSelectedAlarm.evaluationPeriods} consecutive
+                  </span>
+                </div>
+              </div>
+
               <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800/80 p-3 rounded-lg border border-slate-200 dark:border-slate-700 font-mono leading-relaxed">
-                <strong>Evaluation Reason: </strong>
+                <strong>Evaluation Status Reason: </strong>
                 {currentSelectedAlarm.stateReason}
               </div>
             </div>
 
-            {/* Sliding Window Datapoint Buffer */}
+            {/* Consecutive Periods Sliding Buffer */}
             <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center">
                   <Sliders className="w-4 h-4 mr-1.5 text-amber-500" />
-                  Sliding Evaluation Window ({currentSelectedAlarm.datapointsToAlarm} of{' '}
-                  {currentSelectedAlarm.evaluationPeriods} Breaching Required)
+                  Consecutive Periods Evaluation Buffer ({currentSelectedAlarm.evaluationPeriods} periods)
                 </h4>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                  Threshold: {currentSelectedAlarm.threshold}
+                  Breaching Rule: {getOperatorSymbol(currentSelectedAlarm.comparisonOperator)}{' '}
+                  {currentSelectedAlarm.threshold}
                 </span>
               </div>
 
               <div className="grid grid-cols-5 gap-2 pt-1">
                 {currentSelectedAlarm.evaluationBuffer.map((val, idx) => {
                   const isBreaching =
-                    currentSelectedAlarm.comparisonOperator.includes('Greater')
+                    currentSelectedAlarm.comparisonOperator === 'GreaterThanThreshold'
+                      ? val > currentSelectedAlarm.threshold
+                      : currentSelectedAlarm.comparisonOperator === 'GreaterThanOrEqualToThreshold'
                       ? val >= currentSelectedAlarm.threshold
+                      : currentSelectedAlarm.comparisonOperator === 'LessThanThreshold'
+                      ? val < currentSelectedAlarm.threshold
                       : val <= currentSelectedAlarm.threshold;
 
                   return (
@@ -334,7 +655,7 @@ export const AlarmManager: React.FC = () => {
                       }`}
                     >
                       <div className="text-[10px] text-slate-400">
-                        Period -{currentSelectedAlarm.evaluationBuffer.length - idx}
+                        Period #{idx + 1}
                       </div>
                       <div className="text-sm font-bold">{val}</div>
                       <div className="text-[9px] mt-0.5 uppercase font-bold">
@@ -344,12 +665,77 @@ export const AlarmManager: React.FC = () => {
                   );
                 })}
               </div>
+
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                <strong>Consecutive Period Rule:</strong> CloudWatch requires all{' '}
+                <span className="font-bold text-slate-900 dark:text-white">
+                  {currentSelectedAlarm.evaluationPeriods} consecutive periods
+                </span>{' '}
+                to breach threshold before transitioning to <strong className="text-rose-500">ALARM</strong>.
+                If metrics recover, it transitions back to <strong className="text-emerald-500">OK</strong>.
+              </div>
+            </div>
+
+            {/* Interactive Step-by-Step Feeder */}
+            <div className="my-4 bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center">
+                  <Play className="w-3.5 h-3.5 mr-1.5 text-emerald-500" />
+                  Test Consecutive Evaluation In Real-Time
+                </h4>
+                <span className="text-[10px] text-slate-400 font-mono">Simulate Datapoint</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  value={testFeedValue}
+                  onChange={(e) => setTestFeedValue(Number(e.target.value))}
+                  className="w-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                />
+                <button
+                  onClick={() =>
+                    injectDatapoint(
+                      currentSelectedAlarm.resourceId,
+                      currentSelectedAlarm.metricName,
+                      testFeedValue
+                    )
+                  }
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs rounded-lg transition"
+                >
+                  Feed Value
+                </button>
+                <button
+                  onClick={() =>
+                    injectDatapoint(
+                      currentSelectedAlarm.resourceId,
+                      currentSelectedAlarm.metricName,
+                      currentSelectedAlarm.threshold + 5
+                    )
+                  }
+                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-lg transition"
+                >
+                  + Breaching ({currentSelectedAlarm.threshold + 5})
+                </button>
+                <button
+                  onClick={() =>
+                    injectDatapoint(
+                      currentSelectedAlarm.resourceId,
+                      currentSelectedAlarm.metricName,
+                      currentSelectedAlarm.threshold - 10
+                    )
+                  }
+                  className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-lg transition"
+                >
+                  + Safe ({currentSelectedAlarm.threshold - 10})
+                </button>
+              </div>
             </div>
 
             {/* Time-Series Graph */}
-            <div className="my-4 bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="my-2 bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700">
               <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2">
-                Metric Evaluation vs Threshold
+                Metric Evaluation vs Threshold Line
               </h4>
               <div className="h-44 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -394,7 +780,7 @@ export const AlarmManager: React.FC = () => {
             <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex-1">
               <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3 flex items-center">
                 <Clock className="w-4 h-4 mr-1.5 text-slate-400" />
-                State Transition History
+                Alarm State Transition History
               </h4>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {currentSelectedAlarm.history.map((hist, idx) => (
@@ -419,10 +805,17 @@ export const AlarmManager: React.FC = () => {
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {new Date(hist.timestamp).toLocaleTimeString()}
+                        {new Date(hist.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true
+                        })}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{hist.reason}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      {hist.reason}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -431,9 +824,9 @@ export const AlarmManager: React.FC = () => {
         </div>
       )}
 
-      {/* Create Alarm Wizard Modal */}
+      {/* ================= CREATE ALARM WIZARD MODAL ================= */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-xl p-6 shadow-2xl animate-scaleIn">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center space-x-2">
@@ -445,7 +838,7 @@ export const AlarmManager: React.FC = () => {
                     Create CloudWatch Alarm
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Configure metric threshold and M of N evaluation periods
+                    Configure metric threshold and consecutive evaluation periods
                   </p>
                 </div>
               </div>
@@ -471,6 +864,18 @@ export const AlarmManager: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
@@ -483,7 +888,7 @@ export const AlarmManager: React.FC = () => {
                   >
                     {resources.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.name} ({r.id})
+                        {r.name} ({r.type})
                       </option>
                     ))}
                   </select>
@@ -519,10 +924,10 @@ export const AlarmManager: React.FC = () => {
                     onChange={(e) => setFormOperator(e.target.value as ComparisonOperator)}
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-white font-medium"
                   >
-                    <option value="GreaterThanOrEqualToThreshold">Greater Than or Equal (≥)</option>
-                    <option value="GreaterThanThreshold">Greater Than (&gt;)</option>
-                    <option value="LessThanOrEqualToThreshold">Less Than or Equal (≤)</option>
-                    <option value="LessThanThreshold">Less Than (&lt;)</option>
+                    <option value="GreaterThanThreshold">&gt; (Greater Than)</option>
+                    <option value="GreaterThanOrEqualToThreshold">&gt;= (Greater Than or Equal)</option>
+                    <option value="LessThanThreshold">&lt; (Less Than)</option>
+                    <option value="LessThanOrEqualToThreshold">&lt;= (Less Than or Equal)</option>
                   </select>
                 </div>
 
@@ -540,44 +945,27 @@ export const AlarmManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* M of N evaluation settings */}
+              {/* Consecutive evaluation periods */}
               <div className="p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="font-semibold text-amber-600 dark:text-amber-400 flex items-center">
                   <Info className="w-3.5 h-3.5 mr-1" />
-                  Multi-Period Sliding Evaluation Buffer (M out of N):
+                  Consecutive Evaluation Periods:
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-500 dark:text-slate-400 block mb-1">
-                      Evaluation Periods (N):
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={formEvaluationPeriods}
-                      onChange={(e) => {
-                        const n = Number(e.target.value);
-                        setFormEvaluationPeriods(n);
-                        if (formDatapointsToAlarm > n) setFormDatapointsToAlarm(n);
-                      }}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-slate-500 dark:text-slate-400 block mb-1">
-                      Datapoints to Alarm (M):
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={formEvaluationPeriods}
-                      value={formDatapointsToAlarm}
-                      onChange={(e) => setFormDatapointsToAlarm(Number(e.target.value))}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
-                    />
-                  </div>
+                <div>
+                  <label className="text-slate-500 dark:text-slate-400 block mb-1">
+                    Consecutive Periods Required (N):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formEvaluationPeriods}
+                    onChange={(e) => setFormEvaluationPeriods(Number(e.target.value))}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-slate-900 dark:text-white font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Alarm will trigger OK → ALARM only if condition is satisfied for {formEvaluationPeriods} consecutive periods.
+                  </span>
                 </div>
               </div>
 
