@@ -35,7 +35,7 @@ The platform makes the canonical AWS CloudWatch monitoring lifecycle visually ev
 
 ---
 
-## 🌟 Unique Enhancement: Interactive CloudWatch Learning Mode
+## Unique Enhancement: Interactive CloudWatch Learning Mode
 
 > [!NOTE]
 > In accordance with the assignment guidelines, this project avoids common buzzwords like AI recommendations or basic anomaly detection (which AWS natively offers). Instead, our enhancement is an **Educational CloudWatch State Machine Laboratory**.

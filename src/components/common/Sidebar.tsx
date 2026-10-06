@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* SECTION 2: OUR ENHANCEMENT */}
+          {/* SECTION 2: Interactive Learning Lab */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
             <div
               className={`px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center justify-between ${
@@ -218,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <span className="flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                Our Enhancement
+                Interactive Learning Lab
               </span>
               <span className="text-[9px] font-mono px-1 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold">
                 Plus

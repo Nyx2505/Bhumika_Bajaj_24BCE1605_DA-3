@@ -73,7 +73,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             </p>
           </div>
 
-          {/* Core Distinction: CloudWatch vs Our Enhancement */}
+          {/* Core Distinction: CloudWatch vs Interactive Learning Lab*/}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
               Clear Architectural Scope
