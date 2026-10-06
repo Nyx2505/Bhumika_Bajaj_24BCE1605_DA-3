@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 Executive Summary & Assignment Context
+##  Executive Summary & Assignment Context
 
 This web application is a full, functional simulator of **Amazon CloudWatch**, built to demonstrate the practical application of AWS monitoring, telemetry ingestion, alarm evaluation, and operational log correlation.
 
@@ -16,7 +16,7 @@ Rather than connecting to a live, paid AWS account with sensitive credentials, t
 
 ---
 
-## 🔄 Core User Flow
+##  Core User Flow
 
 The platform makes the canonical AWS CloudWatch monitoring lifecycle visually evident and interactive across the top pipeline navigator:
 
@@ -40,7 +40,7 @@ The platform makes the canonical AWS CloudWatch monitoring lifecycle visually ev
 ## Unique Enhancement: Interactive CloudWatch Learning Mode
 
 > [!NOTE]
-> In accordance with the assignment guidelines, this project avoids common buzzwords like AI recommendations or basic anomaly detection (which AWS natively offers). Instead, our enhancement is an **Educational CloudWatch State Machine Laboratory**.
+The enhancement is an **Educational CloudWatch State Machine Laboratory**.
 
 The Learning Mode provides two specialized pedagogical environments:
 
@@ -65,7 +65,7 @@ The Learning Mode provides two specialized pedagogical environments:
 
 ---
 
-## 🏗️ Simulated AWS Infrastructure Topology
+##  Simulated AWS Infrastructure Topology
 
 The simulator tracks five distinct resources spanning four core AWS services:
 1. **EC2 Web Server (`i-0a812fec99`)**: `CPUUtilization`, `NetworkIn`, `NetworkOut`, `StatusCheckFailed`
@@ -76,7 +76,7 @@ The simulator tracks five distinct resources spanning four core AWS services:
 
 ---
 
-## ⚡ Incident & Chaos Injection Drawer
+##  Incident & Chaos Injection Drawer
 
 Click the **"Chaos Scenarios"** button in the top navigation to trigger real-world AWS incidents:
 - **Flash Crowd**: Surges web traffic, driving EC2 CPU past 90%.
@@ -86,7 +86,7 @@ Click the **"Chaos Scenarios"** button in the top navigation to trigger real-wor
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 - **Frontend**: React 18/19, TypeScript, Vite
 - **Styling**: Tailwind CSS (AWS Management Console Dark Palette)
@@ -96,7 +96,7 @@ Click the **"Chaos Scenarios"** button in the top navigation to trigger real-wor
 
 ---
 
-## 🚀 Getting Started Locally
+##  Getting Started Locally
 
 ### Prerequisites
 - Node.js (v18 or higher)
@@ -126,7 +126,7 @@ npm run preview
 
 ---
 
-## 🌐 Deployment
+##  Deployment
 
 The application is completely static and can be deployed directly to:
 - **Vercel**: Connect the GitHub repository and deploy with default Vite settings.
